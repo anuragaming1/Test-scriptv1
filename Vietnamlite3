@@ -1,6 +1,25 @@
 -- Đảm bảo Lighting được sử dụng local Lighting = game:GetService("Lighting")
 
--- Cấu hình ánh sáng hoàng hôn local function setSunsetShader() Lighting.TimeOfDay = "18:30:00" -- Giờ hoàng hôn Lighting.Brightness = 0.5 Lighting.OutdoorAmbient = Color3.fromRGB(255, 94, 77) -- Màu đỏ cam nhẹ Lighting.Ambient = Color3.fromRGB(255, 153, 102) Lighting.FogEnd = 500 -- Tạo hiệu ứng mờ xa Lighting.FogColor = Color3.fromRGB(255, 140, 105)
+-- Cấu hình ánh sáng hoàng hôn nâng cao local function setSunsetShader() Lighting.TimeOfDay = "18:30:00" -- Giờ hoàng hôn Lighting.Brightness = 0.7 Lighting.OutdoorAmbient = Color3.fromRGB(255, 120, 90) -- Màu đỏ cam ấm hơn Lighting.Ambient = Color3.fromRGB(255, 160, 120) Lighting.FogEnd = 400 -- Giảm khoảng cách sương mù để tạo hiệu ứng mờ hơn Lighting.FogStart = 50 Lighting.FogColor = Color3.fromRGB(255, 110, 90)
+
+-- Tăng độ tương phản của ánh sáng mặt trời
+Lighting.ColorShift_Top = Color3.fromRGB(255, 100, 80)
+Lighting.ColorShift_Bottom = Color3.fromRGB(150, 60, 40)
+
+-- Thêm hiệu ứng Bloom để ánh sáng mềm mại hơn
+local bloom = Instance.new("BloomEffect")
+bloom.Intensity = 0.7
+bloom.Threshold = 0.9
+bloom.Size = 24
+bloom.Parent = Lighting
+
+-- Thêm hiệu ứng DepthOfField để làm mờ nền xa hơn
+local depth = Instance.new("DepthOfFieldEffect")
+depth.FarIntensity = 0.5
+depth.FocusDistance = 100
+depth.InFocusRadius = 50
+depth.NearIntensity = 0.3
+depth.Parent = Lighting
 
 -- Hiệu ứng màu sắc của bầu trời
 if Lighting:FindFirstChild("Sky") then
@@ -15,4 +34,4 @@ end
 
 end
 
--- Gọi hàm để áp dụng hiệu ứng setSunsetShader()
+
