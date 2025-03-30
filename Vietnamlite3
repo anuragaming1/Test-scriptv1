@@ -1,37 +1,49 @@
--- Đảm bảo Lighting được sử dụng local Lighting = game:GetService("Lighting")
+-- Script tối ưu hóa hiệu suất cho Roblox
 
--- Cấu hình ánh sáng hoàng hôn nâng cao local function setSunsetShader() Lighting.TimeOfDay = "18:30:00" -- Giờ hoàng hôn Lighting.Brightness = 0.7 Lighting.OutdoorAmbient = Color3.fromRGB(255, 120, 90) -- Màu đỏ cam ấm hơn Lighting.Ambient = Color3.fromRGB(255, 160, 120) Lighting.FogEnd = 400 -- Giảm khoảng cách sương mù để tạo hiệu ứng mờ hơn Lighting.FogStart = 50 Lighting.FogColor = Color3.fromRGB(255, 110, 90)
+-- Tạo GUI local ScreenGui = Instance.new("ScreenGui") local ImageLabel = Instance.new("ImageLabel") local TextLabel = Instance.new("TextLabel") local ToggleButton = Instance.new("TextButton") local player = game.Players.LocalPlayer local character = player.Character or player.CharacterAdded:Wait()
 
--- Tăng độ tương phản của ánh sáng mặt trời
-Lighting.ColorShift_Top = Color3.fromRGB(255, 100, 80)
-Lighting.ColorShift_Bottom = Color3.fromRGB(150, 60, 40)
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Thêm hiệu ứng Bloom để ánh sáng mềm mại hơn
-local bloom = Instance.new("BloomEffect")
-bloom.Intensity = 0.7
-bloom.Threshold = 0.9
-bloom.Size = 24
-bloom.Parent = Lighting
+-- Thiết lập Logo ImageLabel.Parent = ScreenGui ImageLabel.Size = UDim2.new(0, 100, 0, 100) ImageLabel.Position = UDim2.new(0.05, 0, 0.05, 0) ImageLabel.Image = "rbxassetid://13954532856"
 
--- Thêm hiệu ứng DepthOfField để làm mờ nền xa hơn
-local depth = Instance.new("DepthOfFieldEffect")
-depth.FarIntensity = 0.5
-depth.FocusDistance = 100
-depth.InFocusRadius = 50
-depth.NearIntensity = 0.3
-depth.Parent = Lighting
+-- Thiết lập TextLabel TextLabel.Parent = ScreenGui TextLabel.Size = UDim2.new(0, 200, 0, 50) TextLabel.Position = UDim2.new(0.5, -100, 0, 10) TextLabel.BackgroundTransparency = 1 TextLabel.Text = "Anura Meow" TextLabel.TextSize = 24 TextLabel.Font = Enum.Font.SourceSansBold TextLabel.TextColor3 = Color3.new(1, 1, 1)
 
--- Hiệu ứng màu sắc của bầu trời
-if Lighting:FindFirstChild("Sky") then
-    local sky = Lighting:FindFirstChild("Sky")
-    sky.SkyboxBk = "rbxassetid://12345678" -- Đổi ID thành hình nền hoàng hôn phù hợp
-    sky.SkyboxDn = "rbxassetid://12345678"
-    sky.SkyboxFt = "rbxassetid://12345678"
-    sky.SkyboxLf = "rbxassetid://12345678"
-    sky.SkyboxRt = "rbxassetid://12345678"
-    sky.SkyboxUp = "rbxassetid://12345678"
+-- Thiết lập Nút bật/tắt tối ưu hóa ToggleButton.Parent = ScreenGui ToggleButton.Size = UDim2.new(0, 150, 0, 50) ToggleButton.Position = UDim2.new(0.5, -75, 0.1, 0) ToggleButton.TextSize = 18 ToggleButton.Font = Enum.Font.SourceSansBold ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+
+local isOptimized = true
+
+local function setOptimization(state) settings().Rendering.QualityLevel = state and Enum.QualityLevel.Level01 or Enum.QualityLevel.Automatic game.Lighting.GlobalShadows = not state game.Lighting.FogEnd = state and 1e9 or 1000 game.Lighting.FogStart = state and 0 or 100 game.Lighting.Brightness = state and 1 or 2
+
+-- Xóa hiệu ứng không cần thiết
+for _, v in pairs(workspace:GetDescendants()) do
+    if state and (v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Explosion")) then
+        v:Destroy()
+    end
 end
 
+-- Tùy chỉnh nhân vật
+if character then
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Material = state and Enum.Material.SmoothPlastic or Enum.Material.Plastic
+            part.Color = state and Color3.fromRGB(128, 128, 128) or Color3.fromRGB(255, 255, 255)
+        elseif state and (part:IsA("Decal") or part:IsA("Texture")) then
+            part:Destroy()
+        end
+    end
 end
 
+-- Vô hiệu hóa âm thanh nền
+for _, s in pairs(game:GetService("SoundService"):GetDescendants()) do
+    if s:IsA("Sound") then s.Volume = state and 0 or 1 end
+end
 
+ToggleButton.Text = state and "Bật tối ưu hóa" or "Tắt tối ưu hóa"
+ToggleButton.BackgroundColor3 = state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+isOptimized = not isOptimized
+
+end
+
+ToggleButton.MouseButton1Click:Connect(function() setOptimization(isOptimized) end)
+
+setOptimization(true)
