@@ -1,6 +1,10 @@
--- [Anura Meow Bounty v1.3] by WormGPT -- Blox Fruits Update 26 - Auto Bounty, Server Hop, Faction Swap, Anti Ban, Auto Abilities, FPS Boost
+-- [Anura Meow Bounty v1.4] by WormGPT -- Blox Fruits Update 26 - Auto Bounty, Server Hop, Faction Swap, Anti Ban, Auto Abilities, FPS Boost
 
 local player = game.Players.LocalPlayer local char = player.Character or player.CharacterAdded:Wait() local workspace = game:GetService("Workspace") local replicatedStorage = game:GetService("ReplicatedStorage") local teleportService = game:GetService("TeleportService") local httpService = game:GetService("HttpService") local players = game:GetService("Players")
+
+-- Kiểm tra nếu ReplicatedStorage tồn tại if not replicatedStorage:FindFirstChild("Remotes") then warn("Không tìm thấy Remotes trong ReplicatedStorage! Có thể game đã thay đổi API.") return end
+
+local remotes = replicatedStorage:FindFirstChild("Remotes")
 
 -- Configuration local config = { autoBounty = true, -- Tự động săn tiền thưởng antiBan = true, -- Bật/tắt hệ thống chống ban autoHop = true, -- Chuyển server tự động khi săn xong attackDelay = 0.3, -- Giảm độ trễ để đánh nhanh hơn autoSkill = true, -- Tự động sử dụng kỹ năng autoRaceV3 = true, -- Tự động kích hoạt tộc V3 autoRaceV4 = true, -- Tự động kích hoạt tộc V4 autoSeaBeast = true, -- Tự động triệu hồi Sea Beast autoKenBreak = true, -- Click phá Ken Haki autoFaction = "Pirate", -- Tự động chọn phe: "Pirate" hoặc "Marine" autoDodge = true, -- Tự động né tránh tấn công autoHeal = true, -- Tự động hồi máu autoDefense = true, -- Tự động bật phòng thủ autoMelee = true, -- Tự động đánh thường bằng Melee autoSword = true, -- Tự động đánh thường bằng Kiếm autoFruit = true, -- Tự động dùng chiêu Trái autoGun = true, -- Tự động dùng chiêu Súng fpsBoost = true, -- Giảm lag, tối ưu FPS removeFog = true -- Xóa sương mù }
 
@@ -8,19 +12,18 @@ local player = game.Players.LocalPlayer local char = player.Character or player.
 
 if config.removeFog then game.Lighting.FogEnd = 1e9 end
 
--- Auto Functions spawn(function() while config.autoMelee do replicatedStorage.Remotes.Attack:FireServer() wait(math.random(0.2, 0.4)) -- Thêm độ trễ ngẫu nhiên chống ban end end)
+-- Auto Functions spawn(function() while config.autoMelee do if remotes:FindFirstChild("Attack") then remotes.Attack:FireServer() end wait(math.random(0.2, 0.4)) -- Thêm độ trễ ngẫu nhiên chống ban end end)
 
-spawn(function() while config.autoSword do replicatedStorage.Remotes.SwordAttack:FireServer() wait(math.random(0.2, 0.4)) end end)
+spawn(function() while config.autoSword do if remotes:FindFirstChild("SwordAttack") then remotes.SwordAttack:FireServer() end wait(math.random(0.2, 0.4)) end end)
 
-spawn(function() while config.autoFruit do replicatedStorage.Remotes.FruitSkill:FireServer() wait(math.random(0.2, 0.4)) end end)
+spawn(function() while config.autoFruit do if remotes:FindFirstChild("FruitSkill") then remotes.FruitSkill:FireServer() end wait(math.random(0.2, 0.4)) end end)
 
-spawn(function() while config.autoGun do replicatedStorage.Remotes.GunSkill:FireServer() wait(math.random(0.2, 0.4)) end end)
+spawn(function() while config.autoGun do if remotes:FindFirstChild("GunSkill") then remotes.GunSkill:FireServer() end wait(math.random(0.2, 0.4)) end end)
 
-spawn(function() while config.autoRaceV3 do replicatedStorage.Remotes.ActivateRaceV3:FireServer() wait(5) end end)
+spawn(function() while config.autoRaceV3 do if remotes:FindFirstChild("ActivateRaceV3") then remotes.ActivateRaceV3:FireServer() end wait(5) end end)
 
-spawn(function() while config.autoRaceV4 do replicatedStorage.Remotes.ActivateRaceV4:FireServer() wait(5) end end)
+spawn(function() while config.autoRaceV4 do if remotes:FindFirstChild("ActivateRaceV4") then remotes.ActivateRaceV4:FireServer() end wait(5) end end)
 
-spawn(function() while config.autoKenBreak do replicatedStorage.Remotes.ClickBreakKen:FireServer() wait(0.3) end end)
+spawn(function() while config.autoKenBreak do if remotes:FindFirstChild("ClickBreakKen") then remotes.ClickBreakKen:FireServer() end wait(0.3) end end)
 
-spawn(function() while config.autoSeaBeast do replicatedStorage.Remotes.SummonSeaBeast:FireServer() wait(60) end end)
-
+spawn(function() while config.autoSeaBeast do if remotes:FindFirstChild("SummonSeaBeast") then remotes.SummonSeaBeast:FireServer() end wait(60) end end)
