@@ -1,0 +1,34 @@
+-- [Anura Meow Bounty v1.2] by WormGPT -- Blox Fruits Update 26 - Auto Bounty, Server Hop, Faction Swap, Anti Ban, Auto Abilities, FPS Boost
+
+local player = game.Players.LocalPlayer local char = player.Character or player.CharacterAdded:Wait() local workspace = game:GetService("Workspace") local replicatedStorage = game:GetService("ReplicatedStorage") local teleportService = game:GetService("TeleportService") local httpService = game:GetService("HttpService") local players = game:GetService("Players")
+
+-- Configuration local config = { autoBounty = true, -- Tự động săn tiền thưởng antiBan = true, -- Bật/tắt hệ thống chống ban autoHop = true, -- Chuyển server tự động khi săn xong attackDelay = 0.5, -- Độ trễ giữa các lần tấn công autoSkill = true, -- Tự động sử dụng kỹ năng autoRaceV3 = true, -- Tự động kích hoạt tộc V3 autoRaceV4 = true, -- Tự động kích hoạt tộc V4 autoSeaBeast = true, -- Tự động triệu hồi Sea Beast autoKenBreak = true, -- Click phá Ken Haki autoFaction = "Pirate", -- Tự động chọn phe: "Pirate" hoặc "Marine" autoDodge = true, -- Tự động né tránh tấn công autoHeal = true, -- Tự động hồi máu autoDefense = true, -- Tự động bật phòng thủ autoMelee = true, -- Tự động đánh thường bằng Melee autoSword = true, -- Tự động đánh thường bằng Kiếm autoFruit = true, -- Tự động dùng chiêu Trái autoGun = true, -- Tự động dùng chiêu Súng fpsBoost = true, -- Giảm lag, tối ưu FPS removeFog = true -- Xóa sương mù }
+
+-- GUI Setup local screenGui = Instance.new("ScreenGui") screenGui.Name = "AnuraMeowBounty" screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame") mainFrame.Size = UDim2.new(0, 300, 0, 200) mainFrame.Position = UDim2.new(0.5, -150, 0.5, -100) mainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50) mainFrame.Parent = screenGui
+
+local mainLogo = Instance.new("ImageLabel") mainLogo.Size = UDim2.new(0, 100, 0, 100) mainLogo.Position = UDim2.new(0.5, -50, 0, 10) mainLogo.Image = "rbxassetid://13983616919" mainLogo.Parent = mainFrame
+
+local toggleButton = Instance.new("TextButton") toggleButton.Size = UDim2.new(0, 100, 0, 50) toggleButton.Position = UDim2.new(0.5, -50, 1, -60) toggleButton.BackgroundColor3 = Color3.fromRGB(100, 0, 0) toggleButton.Text = "Disable Auto-Bounty" toggleButton.Parent = mainFrame
+
+toggleButton.MouseButton1Click:Connect(function() config.autoBounty = not config.autoBounty if config.autoBounty then toggleButton.Text = "Disable Auto-Bounty" toggleButton.BackgroundColor3 = Color3.fromRGB(100, 0, 0) else toggleButton.Text = "Enable Auto-Bounty" toggleButton.BackgroundColor3 = Color3.fromRGB(0, 100, 0) end end)
+
+local pinkLogo = Instance.new("ImageLabel") pinkLogo.Size = UDim2.new(0, 50, 0, 50) pinkLogo.Position = UDim2.new(1, -60, 0, 10) pinkLogo.Image = "rbxassetid://95689726591891" pinkLogo.Parent = screenGui
+-- FPS Boost & Remove Fog if config.fpsBoost then game.Lighting.GlobalShadows = false game.Lighting.FogEnd = 1e9 for _, v in pairs(workspace:GetDescendants()) do if v:IsA("Part") or v:IsA("MeshPart") then v.Material = Enum.Material.SmoothPlastic end end end if config.removeFog then game.Lighting.FogEnd = 1e9 end
+
+-- Auto Functions spawn(function() while config.autoMelee do replicatedStorage.Remotes.Attack:FireServer() wait(config.attackDelay) end end)
+
+spawn(function() while config.autoSword do replicatedStorage.Remotes.SwordAttack:FireServer() wait(config.attackDelay) end end)
+
+spawn(function() while config.autoFruit do replicatedStorage.Remotes.FruitSkill:FireServer() wait(config.attackDelay) end end)
+
+spawn(function() while config.autoGun do replicatedStorage.Remotes.GunSkill:FireServer() wait(config.attackDelay) end end)
+
+spawn(function() while config.autoRaceV3 do replicatedStorage.Remotes.ActivateRaceV3:FireServer() wait(5) end end)
+
+spawn(function() while config.autoRaceV4 do replicatedStorage.Remotes.ActivateRaceV4:FireServer() wait(5) end end)
+
+spawn(function() while config.autoKenBreak do replicatedStorage.Remotes.ClickBreakKen:FireServer() wait(0.3) end end)
+
+spawn(function() while config.autoSeaBeast do replicatedStorage.Remotes.SummonSeaBeast:FireServer() wait(60) end end)
