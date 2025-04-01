@@ -1,0 +1,220 @@
+--[[
+  ⚠️ Anura Hub - Auto Bounty Kaitun ⚠️
+  📌 Version: Update 26 (Anti-Ban, Anti-Kick)
+  🔥 Full Auto Combat + Summon Sea Beast
+  📌 Bản quyền: "Anura Hub" (Màu đỏ) + "Auto Bounty" (Màu xanh)
+]]
+
+local Player = game:GetService("Players").LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- UI (Kaitun Mode - Không menu)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AnuraHubUI"
+ScreenGui.Parent = game.CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 250, 0, 150)
+MainFrame.Position = UDim2.new(0.8, 0, 0.1, 0)
+MainFrame.BackgroundTransparency = 0.5
+MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+MainFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Text = "Anura Hub"
+Title.TextColor3 = Color3.fromRGB(255, 0, 0) -- Màu đỏ
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = MainFrame
+
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Text = "Auto Bounty"
+SubTitle.TextColor3 = Color3.fromRGB(0, 255, 0) -- Màu xanh
+SubTitle.Position = UDim2.new(0, 0, 0, 30)
+SubTitle.Size = UDim2.new(1, 0, 0, 20)
+SubTitle.Font = Enum.Font.SourceSans
+SubTitle.Parent = MainFrame
+
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Text = "Status: Running"
+StatusLabel.Position = UDim2.new(0, 0, 0, 50)
+StatusLabel.Size = UDim2.new(1, 0, 0, 20)
+StatusLabel.Font = Enum.Font.SourceSans
+StatusLabel.Parent = MainFrame
+
+local FPSText = Instance.new("TextLabel")
+FPSText.Text = "FPS: 60"
+FPSText.Position = UDim2.new(0, 0, 0, 70)
+FPSText.Size = UDim2.new(1, 0, 0, 20)
+FPSText.Font = Enum.Font.SourceSans
+FPSText.Parent = MainFrame
+
+local TimeText = Instance.new("TextLabel")
+TimeText.Text = "Time: 00:00"
+TimeText.Position = UDim2.new(0, 0, 0, 90)
+TimeText.Size = UDim2.new(1, 0, 0, 20)
+TimeText.Font = Enum.Font.SourceSans
+TimeText.Parent = MainFrame
+
+local NextPlayerButton = Instance.new("TextButton")
+NextPlayerButton.Text = "Next Player ▶"
+NextPlayerButton.Position = UDim2.new(0, 0, 0, 120)
+NextPlayerButton.Size = UDim2.new(1, 0, 0, 30)
+NextPlayerButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+NextPlayerButton.Parent = MainFrame
+
+-- Variables
+local _G = {
+    AutoBounty = true,
+    AutoSkills = true,
+    AutoInstinct = true,
+    AutoAura = true,
+    AutoRaceV3 = true,
+    AutoRaceV4 = true,
+    AutoSeaBeast = true,
+    TargetPlayer = nil,
+    LastAttack = 0,
+    StartTime = os.time(),
+    NextPlayerCooldown = 0
+}
+
+-- Anti-Ban & Anti-Kick (Update 26)
+local function AntiBan()
+    while task.wait(5) do
+        pcall(function()
+            -- Fake Remote Events (Chống phát hiện)
+            for _, v in pairs(getgc(true)) do
+                if typeof(v) == "function" and not is_synapse_function(v) then
+                    hookfunction(v, function(...)
+                        return true
+                    end)
+                end
+            end
+
+            -- Anti-Kick
+            game:GetService("Players").LocalPlayer.OnTeleport:Connect(function()
+                queue_on_teleport("loadstring(game:HttpGet('https://raw.githubusercontent.com/AnuraHub/AnuraScript/main/AutoBounty.lua'))()")
+            end)
+        end)
+    end
+end
+
+-- Auto Skills (Melee, Blox Fruit, Sword, Gun)
+local function UseSkills()
+    if not _G.AutoSkills then return end
+
+    -- Melee (Z, X, C)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Z")
+    task.wait(0.2)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("X")
+    task.wait(0.2)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("C")
+
+    -- Blox Fruit (Z, X, C, V, F)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Z")
+    task.wait(0.2)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("X")
+    task.wait(0.2)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("C")
+    task.wait(0.2)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("V")
+    task.wait(0.2)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("F")
+
+    -- Sword (Z, X)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Z")
+    task.wait(0.2)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("X")
+
+    -- Gun (Z, X)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Z")
+    task.wait(0.2)
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("X")
+end
+
+-- Auto Instinct/Aura/Race V3/V4
+local function AutoBuffs()
+    if _G.AutoInstinct then
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("ActivateInstinct")
+    end
+
+    if _G.AutoAura then
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("ActivateAura")
+    end
+
+    if _G.AutoRaceV3 then
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("ActivateRaceV3")
+    end
+
+    if _G.AutoRaceV4 then
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("ActivateRaceV4")
+    end
+end
+
+-- Auto Summon Sea Beast (Khi đạt 10M Bounty)
+local function SummonSeaBeast()
+    if _G.AutoSeaBeast and Player:WaitForChild("leaderstats").Bounty.Value >= 10000000 then
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("SummonSeaBeast")
+    end
+end
+
+-- Auto Bounty & Combat
+local function AutoBounty()
+    while _G.AutoBounty and task.wait() do
+        -- Cập nhật FPS & Time
+        FPSText.Text = "FPS: " .. math.floor(1 / game:GetService("RunService").Heartbeat:Wait())
+        TimeText.Text = "Time: " .. os.date("%M:%S", os.time() - _G.StartTime)
+
+        -- Tìm người chơi gần nhất
+        local closestPlayer = nil
+        local minDistance = math.huge
+
+        for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+            if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                local distance = (RootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                if distance < minDistance then
+                    minDistance = distance
+                    closestPlayer = v
+                end
+            end
+        end
+
+        -- Nếu có mục tiêu
+        if closestPlayer then
+            _G.TargetPlayer = closestPlayer
+            StatusLabel.Text = "Target: " .. closestPlayer.Name
+
+            -- Di chuyển đến mục tiêu
+            RootPart.CFrame = CFrame.new(closestPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, 5, 0))
+
+            -- Tự động đánh thường
+            game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.1)
+
+            -- Dùng chiêu thức
+            UseSkills()
+
+            -- Auto Buffs
+            AutoBuffs()
+
+            -- Summon Sea Beast (Nếu đủ 10M Bounty)
+            SummonSeaBeast()
+        else
+            StatusLabel.Text = "Status: Waiting for players..."
+        end
+    end
+end
+
+-- Next Player (Đổi mục tiêu)
+NextPlayerButton.MouseButton1Click:Connect(function()
+    if os.time() > _G.NextPlayerCooldown then
+        _G.TargetPlayer = nil
+        _G.NextPlayerCooldown = os.time() + 3
+    end
+end)
+
+-- Bắt đầu script
+coroutine.wrap(AntiBan)()
+coroutine.wrap(AutoBounty)()
