@@ -1,0 +1,398 @@
+-- Tải thư viện cần thiết
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+
+-- Biến toàn cục
+_G.AutoBounty = true
+_G.TargetPlayer = nil
+_G.StartTime = tick()
+_G.LastFPSCheck = tick()
+_G.SafeMode = false
+_G.BountyGoal = 10000000
+_G.LastHopTime = tick()
+_G.LastSkillCheck = tick()
+_G.AntiBanActive = true
+_G.ConnectionLogs = {}
+
+-- Cấu hình
+local Config = {
+    FlySpeed = 50,
+    AttackDelay = 0.1,
+    HopServerInterval = 300, -- 5 phút
+    MaxDistance = 500,
+    SafeZonePosition = Vector3.new(0, 100, 0),
+    SkillCooldown = 1,
+    FPSLimit = 60
+}
+
+-- Hàm hiển thị tên script
+local function DisplayScriptName()
+    local ScreenGui = Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))
+    ScreenGui.Name = "AnuraHubGui"
+    local Title = Instance.new("TextLabel", ScreenGui)
+    Title.Size = UDim2.new(0, 200, 0, 50)
+    Title.Position = UDim2.new(0, 10, 0, 10)
+    Title.BackgroundTransparency = 1
+    Title.Text = "Anura Hub"
+    Title.TextColor3 = Color3.fromRGB(255, 0, 0) -- Màu đỏ
+    Title.TextSize = 30
+    Title.Font = Enum.Font.SourceSansBold
+    
+    local Feature = Instance.new("TextLabel", ScreenGui)
+    Feature.Size = UDim2.new(0, 200, 0, 50)
+    Feature.Position = UDim2.new(0, 10, 0, 60)
+    Feature.BackgroundTransparency = 1
+    Feature.Text = "Auto Bounty"
+    Feature.TextColor3 = Color3.fromRGB(0, 191, 255) -- Màu xanh nước biển
+    Feature.TextSize = 25
+    Feature.Font = Enum.Font.SourceSans
+    
+    local Stats = Instance.new("TextLabel", ScreenGui)
+    Stats.Size = UDim2.new(0, 200, 0, 50)
+    Stats.Position = UDim2.new(0, 10, 0, 110)
+    Stats.BackgroundTransparency = 1
+    Stats.Text = "FPS: 0 | Runtime: 0s"
+    Stats.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Stats.TextSize = 20
+    Stats.Font = Enum.Font.SourceSans
+    
+    spawn(function()
+        while wait(1) do
+            Stats.Text = "FPS: " .. GetFPS() .. " | Runtime: " .. GetRuntime() .. "s"
+        end
+    end)
+end
+
+-- Hàm đo FPS và thời gian chạy
+local function GetFPS()
+    local currentTime = tick()
+    if currentTime - _G.LastFPSCheck >= 1 then
+        _G.LastFPSCheck = currentTime
+        return math.floor(1 / game:GetService("RunService").RenderStepped:Wait())
+    end
+    return math.floor(1 / game:GetService("RunService").RenderStepped:Wait())
+end
+
+local function GetRuntime()
+    return math.floor(tick() - _G.StartTime)
+end
+
+-- Hàm fly cải tiến
+local function FlyTo(targetPosition)
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    local direction = (targetPosition - humanoidRootPart.Position).Unit
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Velocity = direction * Config.FlySpeed
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVelocity.Parent = humanoidRootPart
+    wait(0.1)
+    bodyVelocity:Destroy()
+end
+
+-- Hàm aim cải tiến
+local function AimAt(target)
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    local targetHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    if targetHRP then
+        local lookAt = CFrame.new(humanoidRootPart.Position, targetHRP.Position)
+        humanoidRootPart.CFrame = lookAt
+    end
+end
+
+-- Hàm tấn công chi tiết
+local function Attack(target)
+    local player = game.Players.LocalPlayer
+    local vim = game:GetService("VirtualInputManager")
+    local character = player.Character or player.CharacterAdded:Wait()
+    
+    -- Đánh thường
+    vim:Button1Down(Vector2.new(0,0))
+    wait(Config.AttackDelay)
+    vim:Button1Up(Vector2.new(0,0))
+    
+    -- Melee skills
+    local meleeKeys = {"Z", "X", "C"}
+    for _, key in pairs(meleeKeys) do
+        if character:FindFirstChild("Humanoid") and tick() - _G.LastSkillCheck >= Config.SkillCooldown then
+            vim:SendKeyEvent(true, key, false, game)
+            wait(0.05)
+            vim:SendKeyEvent(false, key, false, game)
+            _G.LastSkillCheck = tick()
+        end
+    end
+    
+    -- Fruit skills
+    local fruitKeys = {"Z", "X", "C", "V", "F"}
+    for _, key in pairs(fruitKeys) do
+        if character:FindFirstChild("Humanoid") and tick() - _G.LastSkillCheck >= Config.SkillCooldown then
+            vim:SendKeyEvent(true, key, false, game)
+            wait(0.05)
+            vim:SendKeyEvent(false, key, false, game)
+            _G.LastSkillCheck = tick()
+        end
+    end
+    
+    -- Sword skills
+    local swordKeys = {"Z", "X"}
+    for _, key in pairs(swordKeys) do
+        if character:FindFirstChild("Humanoid") and tick() - _G.LastSkillCheck >= Config.SkillCooldown then
+            vim:SendKeyEvent(true, key, false, game)
+            wait(0.05)
+            vim:SendKeyEvent(false, key, false, game)
+            _G.LastSkillCheck = tick()
+        end
+    end
+    
+    -- Gun skills
+    local gunKeys = {"Z", "X"}
+    for _, key in pairs(gunKeys) do
+        if character:FindFirstChild("Humanoid") and tick() - _G.LastSkillCheck >= Config.SkillCooldown then
+            vim:SendKeyEvent(true, key, false, game)
+            wait(0.05)
+            vim:SendKeyEvent(false, key, false, game)
+            _G.LastSkillCheck = tick()
+        end
+    end
+end
+
+-- Hàm chọn target tiếp theo
+local function NextPlayer()
+    local players = game.Players:GetPlayers()
+    local currentPlayer = game.Players.LocalPlayer
+    for i, player in pairs(players) do
+        if player ~= currentPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local distance = (player.Character.HumanoidRootPart.Position - currentPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if distance <= Config.MaxDistance then
+                _G.TargetPlayer = player
+                print("New target: " .. player.Name)
+                break
+            end
+        end
+    end
+end
+
+-- Hàm đổi server cải tiến
+local function HopServer()
+    if tick() - _G.LastHopTime >= Config.HopServerInterval then
+        local teleportService = game:GetService("TeleportService")
+        local placeId = game.PlaceId
+        teleportService:Teleport(placeId, game.Players.LocalPlayer)
+        _G.LastHopTime = tick()
+        print("Hopped to new server")
+    end
+end
+
+-- Hàm bật buffs
+local function EnableBuffs()
+    local player = game.Players.LocalPlayer
+    local rs = game:GetService("ReplicatedStorage")
+    local comm = rs.Remotes.CommF_
+    
+    -- Bật Instinct
+    if not player.Character:FindFirstChild("Observation") then
+        comm:InvokeServer("BuyHaki", "Observation")
+    end
+    
+    -- Bật Aura
+    if not player.Character:FindFirstChild("Buso") then
+        comm:InvokeServer("BuyHaki", "Buso")
+    end
+    
+    -- Bật Race V3
+    if not player.Data.Race.Value:match("V3") then
+        comm:InvokeServer("RaceV3")
+    end
+    
+    -- Bật Race V4
+    if not player.Data.Race.Value:match("V4") then
+        comm:InvokeServer("RaceV4")
+    end
+end
+
+-- Hàm summon Sea Beast
+local function SummonSeaBeast()
+    local rs = game:GetService("ReplicatedStorage")
+    rs.Remotes.CommF_:InvokeServer("BuyBoat", "Beast Hunter")
+    print("Summoned Sea Beast")
+end
+
+-- Hàm teleport đến Safe Zone
+local function ToSafeZone()
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoidRootPart.CFrame = CFrame.new(Config.SafeZonePosition)
+    _G.SafeMode = true
+    wait(5)
+    _G.SafeMode = false
+end
+
+-- Hàm chống ban nâng cao
+local function AntiBan()
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    local oldIndex = mt.__index
+    setreadonly(mt, false)
+    
+    -- Chặn kick/ban
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" or method == "Ban" or method == "Destroy" then
+            table.insert(_G.ConnectionLogs, "Blocked attempt: " .. method .. " at " .. os.time())
+            return nil
+        end
+        return oldNamecall(self, ...)
+    end)
+    
+    -- Bảo vệ index
+    mt.__index = newcclosure(function(t, k)
+        if k == "Kick" or k == "Ban" then
+            return function() end
+        end
+        return oldIndex(t, k)
+    end)
+    
+    setreadonly(mt, true)
+    
+    -- Giả lập hoạt động người chơi
+    spawn(function()
+        while _G.AntiBanActive do
+            game:GetService("VirtualInputManager"):SendKeyEvent(true, "W", false, game)
+            wait(0.1)
+            game:GetService("VirtualInputManager"):SendKeyEvent(false, "W", false, game)
+            wait(math.random(5, 15))
+        end
+    end)
+end
+
+-- Hàm chống kick nâng cao
+local function AntiKick()
+    local player = game.Players.LocalPlayer
+    local connections = {}
+    
+    -- Giám sát network
+    connections[1] = game:GetService("NetworkClient").ChildRemoved:Connect(function()
+        ToSafeZone()
+        HopServer()
+    end)
+    
+    -- Giám sát nhân vật
+    connections[2] = player.CharacterRemoving:Connect(function()
+        if not _G.SafeMode then
+            ToSafeZone()
+        end
+    end)
+    
+    -- Giới hạn FPS để tránh detection
+    spawn(function()
+        while wait(0.1) do
+            if GetFPS() > Config.FPSLimit then
+                wait(0.05)
+            end
+        end
+    end)
+    
+    return connections
+end
+-- Hàm tự động farm tài nguyên phụ
+local function AutoFarmResources()
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    
+    for _, v in pairs(game:GetService("Workspace"):GetChildren()) do
+        if v.Name == "Chest" or v.Name:match("Fruit") then
+            humanoidRootPart.CFrame = v.CFrame
+            wait(0.5)
+            fireclickdetector(v:FindFirstChild("ClickDetector"))
+        end
+    end
+end
+
+-- Hàm kiểm tra và tránh admin
+local function AvoidAdmin()
+    local players = game.Players:GetPlayers()
+    for _, player in pairs(players) do
+        if player:IsInGroup(5060810) or player:GetRankInGroup(5060810) > 1 then -- Blox Fruits group
+            HopServer()
+            print("Detected admin, hopping server")
+            break
+        end
+    end
+end
+
+-- Main loop
+spawn(function()
+    DisplayScriptName()
+    AntiBan()
+    local antiKickConnections = AntiKick()
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
+    
+    while _G.AutoBounty do
+        pcall(function()
+            local player = game.Players.LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()
+            local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+            
+            -- Kiểm tra bounty
+            local bounty = player.leaderstats["Bounty/Honor"].Value
+            if bounty >= _G.BountyGoal then
+                SummonSeaBeast()
+            end
+            
+            -- Bật buffs
+            EnableBuffs()
+            
+            -- Kiểm tra admin
+            AvoidAdmin()
+            
+            -- Tìm và tấn công người chơi
+            if not _G.TargetPlayer or not _G.TargetPlayer.Character or not _G.TargetPlayer.Character:FindFirstChild("Humanoid") or _G.TargetPlayer.Character.Humanoid.Health <= 0 then
+                NextPlayer()
+            end
+            
+            if _G.TargetPlayer then
+                local targetPos = _G.TargetPlayer.Character.HumanoidRootPart.Position
+                FlyTo(targetPos)
+                AimAt(_G.TargetPlayer)
+                Attack(_G.TargetPlayer)
+            end
+            
+            -- Farm tài nguyên phụ
+            if math.random(1, 10) <= 3 then
+                AutoFarmResources()
+            end
+            
+            -- Hop server định kỳ
+            HopServer()
+        end)
+        wait(Config.AttackDelay)
+    end
+end)
+
+-- Xử lý input
+local UIS = game:GetService("UserInputService")
+UIS.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.N then
+        NextPlayer()
+    elseif input.KeyCode == Enum.KeyCode.M then
+        ToSafeZone()
+    elseif input.KeyCode == Enum.KeyCode.H then
+        HopServer()
+    end
+end)
+
+-- Giám sát và log
+spawn(function()
+    while wait(60) do
+        print("Anura Hub Log:")
+        print("Bounty: " .. game.Players.LocalPlayer.leaderstats["Bounty/Honor"].Value)
+        print("Targets killed: " .. (_G.TargetPlayer and _G.TargetPlayer.Character and "1" or "0"))
+        for i, log in pairs(_G.ConnectionLogs) do
+            print("Log " .. i .. ": " .. log)
+        end
+    end
+end)
