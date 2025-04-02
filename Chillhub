@@ -1,0 +1,370 @@
+-- Khởi tạo script với bản quyền
+print("\27[31mAnura Hub\27[0m") -- Tên Anura Hub màu đỏ
+print("\27[36mAuto Bounty\27[0m") -- Auto Bounty màu xanh nước biển
+
+-- Biến global
+_G.AutoBounty = true
+_G.TargetPlayer = nil
+_G.StartTime = tick()
+_G.FPS = 0
+_G.LastHopTime = 0
+_G.BountyGoal = 10000000
+_G.SafeMode = false
+_G.LastActionTime = tick()
+
+-- Dịch vụ
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local VirtualInput = game:GetService("VirtualInputManager")
+local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
+local UserInput = game:GetService("UserInputService")
+
+-- Bảng cấu hình
+local Config = {
+    FlySpeed = 50,
+    AttackDelay = 0.2,
+    HopInterval = 300, -- 5 phút
+    SafeZonePos = Vector3.new(0, 100, 0),
+    MinDistance = 5,
+    MaxDistance = 20,
+    SkillCooldown = 0.3
+}
+
+-- Bảng kỹ năng
+local Skills = {
+    Melee = {"Z", "X", "C"},
+    Fruit = {"Z", "X", "C", "V", "F"},
+    Sword = {"Z", "X"},
+    Gun = {"Z", "X"}
+}
+
+-- Hàm đo FPS
+local function UpdateFPS()
+    local lastTime = tick()
+    local frameCount = 0
+    while _G.AutoBounty do
+        frameCount = frameCount + 1
+        if tick() - lastTime >= 1 then
+            _G.FPS = frameCount
+            frameCount = 0
+            lastTime = tick()
+        end
+        wait()
+    end
+end
+
+-- Hàm kiểm tra kết nối
+local function CheckConnection()
+    if not Players.LocalPlayer then
+        return false
+    end
+    return true
+end
+
+-- Hàm bay từ từ đến mục tiêu
+local function FlyToTarget(targetPos)
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    local humanoid = character:WaitForChild("Humanoid")
+    
+    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    wait(0.1)
+    
+    local direction = (targetPos - humanoidRootPart.Position).Unit
+    local distance = (targetPos - humanoidRootPart.Position).Magnitude
+    
+    while distance > Config.MinDistance and _G.AutoBounty do
+        humanoidRootPart.Velocity = direction * Config.FlySpeed
+        humanoidRootPart.CFrame = CFrame.new(humanoidRootPart.Position, targetPos)
+        distance = (targetPos - humanoidRootPart.Position).Magnitude
+        wait(0.05)
+        
+        -- Chống kick: Giả lập hành vi
+        if tick() - _G.LastActionTime > 10 then
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            _G.LastActionTime = tick()
+        end
+    end
+end
+
+-- Hàm tự động tấn công
+local function AutoAttack(target)
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    
+    -- Aim vào mục tiêu
+    local targetHRP = target.Character:WaitForChild("HumanoidRootPart")
+    character.HumanoidRootPart.CFrame = CFrame.new(character.HumanoidRootPart.Position, targetHRP.Position)
+    
+    -- Đánh thường
+    VirtualUser:Button1Down(Vector2.new(0,0))
+    wait(0.1)
+    VirtualUser:Button1Up(Vector2.new(0,0))
+    
+    -- Sử dụng kỹ năng
+    for _, skillSet in pairs(Skills) do
+        for _, skill in pairs(skillSet) do
+            VirtualInput:SendKeyEvent(true, skill, false, game)
+            wait(0.1)
+            VirtualInput:SendKeyEvent(false, skill, false, game)
+            wait(Config.SkillCooldown)
+        end
+    end
+end
+-- Hàm chọn mục tiêu
+local function SelectTarget()
+    local players = Players:GetPlayers()
+    local target = nil
+    local attempts = 0
+    local maxAttempts = 10
+    
+    repeat
+        target = players[math.random(2, #players)]
+        attempts = attempts + 1
+        wait(0.1)
+    until (target and target ~= Players.LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and target.Character.Humanoid.Health > 0) or attempts >= maxAttempts
+    
+    if attempts >= maxAttempts then
+        return nil
+    end
+    return target
+end
+
+-- Hàm đổi server
+local function HopServer()
+    if tick() - _G.LastHopTime < Config.HopInterval then
+        return
+    end
+    _G.LastHopTime = tick()
+    TeleportService:Teleport(game.PlaceId, Players.LocalPlayer)
+end
+
+-- Hàm bật buff
+local function EnableBuffs()
+    pcall(function()
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("Team", "Pirates")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyHaki", "Observation")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyHaki", "Buso")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("RaceV3", "Buy")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("RaceV4", "Buy")
+    end)
+end
+
+-- Hàm triệu hồi Sea Beast
+local function SummonSeaBeast()
+    pcall(function()
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyBoat", "Beast")
+    end)
+end
+
+-- Hàm teleport đến Safe Zone
+local function ToSafeZone()
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoidRootPart.CFrame = CFrame.new(Config.SafeZonePos)
+    _G.SafeMode = true
+    wait(5)
+    _G.SafeMode = false
+end
+
+-- Hàm kiểm tra anti-ban
+local function AntiBanCheck()
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    
+    -- Giả lập hành vi người chơi
+    local actions = {
+        function() humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end,
+        function() VirtualInput:SendKeyEvent(true, "W", false, game) wait(0.1) VirtualInput:SendKeyEvent(false, "W", false, game) end,
+        function() VirtualInput:SendKeyEvent(true, "S", false, game) wait(0.1) VirtualInput:SendKeyEvent(false, "S", false, game) end
+    }
+    
+    actions[math.random(1, #actions)]()
+    _G.LastActionTime = tick()
+end
+
+-- Hàm chống kick
+local function AntiKick()
+    pcall(function()
+        local player = Players.LocalPlayer
+        if player.PlayerGui:FindFirstChild("KickWarning") then
+            HopServer()
+        end
+        -- Giới hạn tốc độ hành động
+        if tick() - _G.LastActionTime < 0.5 then
+            wait(math.random(0.5, 1))
+        end
+    end)
+end
+
+-- Hàm kiểm tra khoảng cách
+local function CheckDistance(target)
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    local targetHRP = target.Character:WaitForChild("HumanoidRootPart")
+    return (humanoidRootPart.Position - targetHRP.Position).Magnitude
+end
+
+-- Hàm xử lý lỗi
+local function ErrorHandler(err)
+    warn("Error: " .. tostring(err))
+    wait(1)
+    if not CheckConnection() then
+        HopServer()
+    end
+end
+
+-- Main loop
+spawn(function()
+    while _G.AutoBounty do
+        pcall(function()
+            local player = Players.LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()
+            local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+            local humanoid = character:WaitForChild("Humanoid")
+            
+            -- Kiểm tra kết nối
+            if not CheckConnection() then
+                HopServer()
+                return
+            end
+            
+            -- Bật buff
+            EnableBuffs()
+            
+            -- Kiểm tra bounty
+            local bounty = player.leaderstats["Bounty/Honor"].Value
+            if bounty >= _G.BountyGoal then
+                SummonSeaBeast()
+            end
+            
+            -- Chọn mục tiêu
+            if not _G.TargetPlayer or not _G.TargetPlayer.Character or not _G.TargetPlayer.Character:FindFirstChild("HumanoidRootPart") or _G.TargetPlayer.Character.Humanoid.Health <= 0 then
+                _G.TargetPlayer = SelectTarget()
+                if not _G.TargetPlayer then
+                    ToSafeZone()
+                    return
+                end
+            end
+            
+            -- Kiểm tra khoảng cách
+            local distance = CheckDistance(_G.TargetPlayer)
+            if distance > Config.MaxDistance then
+                FlyToTarget(_G.TargetPlayer.Character.HumanoidRootPart.Position)
+            end
+            
+            -- Tấn công
+            if distance <= Config.MaxDistance and not _G.SafeMode then
+                AutoAttack(_G.TargetPlayer)
+            end
+            
+            -- Anti-ban và chống kick
+            AntiBanCheck()
+            AntiKick()
+            
+            -- Hiển thị thông tin
+            local timeUsed = math.floor(tick() - _G.StartTime)
+            print(string.format("FPS: %d | Time: %ds | Bounty: %d | Target: %s", _G.FPS, timeUsed, bounty, _G.TargetPlayer and _G.TargetPlayer.Name or "None"))
+            
+            -- Random delay
+            wait(math.random(0.5, 1.5))
+        end, ErrorHandler)
+        wait(0.1)
+    end
+end)
+
+-- Chạy đo FPS
+spawn(UpdateFPS)
+
+-- Xử lý input (Next Player)
+UserInput.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.N then
+        _G.TargetPlayer = SelectTarget()
+        print("Switched to new target: " .. (_G.TargetPlayer and _G.TargetPlayer.Name or "None"))
+    end
+end)
+
+-- Anti-ban nâng cao
+spawn(function()
+    while _G.AutoBounty do
+        pcall(function()
+            local player = Players.LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()
+            local humanoid = character:WaitForChild("Humanoid")
+            
+            -- Giả lập hành vi ngẫu nhiên
+            local randomAction = math.random(1, 5)
+            if randomAction == 1 then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            elseif randomAction == 2 then
+                VirtualInput:SendKeyEvent(true, "W", false, game)
+                wait(0.2)
+                VirtualInput:SendKeyEvent(false, "W", false, game)
+            elseif randomAction == 3 then
+                VirtualInput:SendKeyEvent(true, "A", false, game)
+                wait(0.2)
+                VirtualInput:SendKeyEvent(false, "A", false, game)
+            elseif randomAction == 4 then
+                VirtualInput:SendKeyEvent(true, "S", false, game)
+                wait(0.2)
+                VirtualInput:SendKeyEvent(false, "S", false, game)
+            elseif randomAction == 5 then
+                VirtualInput:SendKeyEvent(true, "D", false, game)
+                wait(0.2)
+                VirtualInput:SendKeyEvent(false, "D", false, game)
+            end
+            
+            -- Kiểm tra hoạt động bất thường
+            if tick() - _G.LastActionTime > 15 then
+                ToSafeZone()
+            end
+        end)
+        wait(math.random(5, 10))
+    end
+end)
+-- Chống kick nâng cao
+spawn(function()
+    while _G.AutoBounty do
+        pcall(function()
+            local player = Players.LocalPlayer
+            -- Kiểm tra ping
+            if player:GetNetworkPing() > 1000 then
+                HopServer()
+            end
+            -- Kiểm tra thời gian phản hồi
+            if not player.Character or not player.Character:FindFirstChild("Humanoid") then
+                wait(2)
+                if not player.Character then
+                    HopServer()
+                end
+            end
+        end)
+        wait(5)
+    end
+end)
+
+-- Tự động xử lý khi nhân vật chết
+Players.LocalPlayer.CharacterAdded:Connect(function(character)
+    wait(1)
+    EnableBuffs()
+    _G.TargetPlayer = SelectTarget()
+end)
+
+-- Tối ưu hiệu suất
+RunService.Stepped:Connect(function()
+    if _G.AutoBounty then
+        pcall(function()
+            local player = Players.LocalPlayer
+            local character = player.Character
+            if character then
+                character:WaitForChild("Humanoid").WalkSpeed = 16 -- Giữ tốc độ bình thường
+            end
+        end)
+    end
+end)
