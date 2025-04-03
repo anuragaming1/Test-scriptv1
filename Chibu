@@ -1,0 +1,384 @@
+-- Anura Hub Auto Bounty Script
+-- ID: 2025040318480683
+-- Created by Grok (xAI)
+
+-- Hiển thị thông báo bản quyền
+print("\27[31mAnura Hub\27[0m - \27[32mAuto Bounty\27[0m | ID: 2025040318480683")
+
+-- Khởi tạo các biến global
+_G.AutoBounty = false
+_G.AutoSkill = false
+_G.AutoInstinct = false
+_G.AutoAura = false
+_G.AutoRaceV3 = false
+_G.AutoRaceV4 = false
+_G.AutoSummonSeaBeast = false
+_G.AutoHopServer = false
+_G.Faction = "Pirates" -- Config: "Pirates" hoặc "Marines"
+_G.BypassTeleport = true -- Config: true để TP bypass, false để bay thường
+_G.TotalBountyEarned = 0
+_G.KillCount = 0
+_G.StartTime = tick()
+_G.TargetPlayer = nil
+
+-- Tối ưu hiệu suất (FPS Boost, Fix Lag)
+local function OptimizePerformance()
+    pcall(function()
+        game:GetService("Lighting").GlobalShadows = false
+        game:GetService("Lighting").FogEnd = 9e9
+        for _, v in pairs(game:GetDescendants()) do
+            if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
+                v.Material = "Plastic"
+                v.Reflectance = 0
+                v.CastShadow = false
+            elseif v:IsA("Decal") then
+                v.Transparency = 1
+            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+                v.Lifetime = NumberRange.new(0)
+            end
+        end
+    end)
+end
+
+-- Chống ban (Anti-Banwave Update 26)
+local function AntiBan()
+    pcall(function()
+        -- Bỏ qua các kiểm tra client-side
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "function" and getfenv(v).script == game:GetService("Players").LocalPlayer.PlayerScripts.LocalScript then
+                hookfunction(v, function(...) return end)
+            end
+        end
+        -- Vô hiệu hóa báo cáo kick
+        game:GetService("ReplicatedStorage").Remotes.ReportCheater:Destroy()
+        -- Giả lập ping hợp lệ
+        game:GetService("ReplicatedStorage").Remotes.Ping.OnClientEvent:Connect(function()
+            game:GetService("ReplicatedStorage").Remotes.Ping:FireServer()
+        end)
+    end)
+end
+
+-- Tìm người chơi ngẫu nhiên
+local function FindRandomPlayer()
+    local players = game:GetService("Players"):GetPlayers()
+    local localPlayer = game:GetService("Players").LocalPlayer
+    local target = nil
+    for _, player in pairs(players) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.Humanoid.Health > 0 then
+            target = player
+            break
+        end
+    end
+    return target
+end
+
+-- Di chuyển đến người chơi
+local function MoveToPlayer(target)
+    local player = game:GetService("Players").LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
+    
+    if targetHRP then
+        if _G.BypassTeleport then
+            humanoidRootPart.CFrame = targetHRP.CFrame * CFrame.new(0, 5, 0)
+        else
+            -- Bay thường
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bodyVelocity.Velocity = (targetHRP.Position - humanoidRootPart.Position).Unit * 50
+            bodyVelocity.Parent = humanoidRootPart
+            wait(1)
+            bodyVelocity:Destroy()
+        end
+    end
+end
+
+-- Sử dụng kỹ năng
+local function UseSkill(skillKey)
+    pcall(function()
+        game:GetService("VirtualInputManager"):SendKeyEvent(true, skillKey, false, game)
+        wait(0.1)
+        game:GetService("VirtualInputManager"):SendKeyEvent(false, skillKey, false, game)
+    end)
+end
+
+-- Tự động tấn công
+local function AutoAttack(target)
+    local player = game:GetService("Players").LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    
+    -- Sử dụng kỹ năng Melee (Z, X, C)
+    UseSkill("Z")
+    wait(0.2)
+    UseSkill("X")
+    wait(0.2)
+    UseSkill("C")
+    wait(0.2)
+    
+    -- Sử dụng kỹ năng Blox Fruit (Z, X, C, V, F)
+    UseSkill("Z")
+    wait(0.2)
+    UseSkill("X")
+    wait(0.2)
+    UseSkill("C")
+    wait(0.2)
+    UseSkill("V")
+    wait(0.2)
+    UseSkill("F")
+    wait(0.2)
+    
+    -- Sử dụng kỹ năng Sword (Z, X)
+    UseSkill("Z")
+    wait(0.2)
+    UseSkill("X")
+    wait(0.2)
+    
+    -- Sử dụng kỹ năng Gun (Z, X)
+    UseSkill("Z")
+    wait(0.2)
+    UseSkill("X")
+    wait(0.2)
+    
+    -- Đánh thường
+    game:GetService("VirtualUser"):Button1Down(Vector2.new(0, 0))
+    wait(0.1)
+    game:GetService("VirtualUser"):Button1Up(Vector2.new(0, 0))
+end
+
+-- Tự động bật các tính năng phụ
+local function AutoEnableFeatures()
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local player = game:GetService("Players").LocalPlayer
+                -- Bật Instinct
+                if _G.AutoInstinct and not player.PlayerGui.Main.Instinct.Visible then
+                    game:GetService("ReplicatedStorage").Remotes.Ability:FireServer("Instinct")
+                end
+                -- Bật Aura
+                if _G.AutoAura and not player.Character:FindFirstChild("Aura") then
+                    game:GetService("ReplicatedStorage").Remotes.Ability:FireServer("Aura")
+                end
+                -- Bật Race V3
+                if _G.AutoRaceV3 then
+                    game:GetService("ReplicatedStorage").Remotes.Ability:FireServer("RaceV3")
+                end
+                -- Bật Race V4
+                if _G.AutoRaceV4 then
+                    game:GetService("ReplicatedStorage").Remotes.Ability:FireServer("RaceV4")
+                end
+            end)
+            wait(1)
+        end
+    end)
+end
+
+-- Tự động summon Sea Beast khi đủ 10M bounty
+local function AutoSummonSeaBeast()
+    spawn(function()
+        while _G.AutoSummonSeaBeast do
+            pcall(function()
+                if game:GetService("Players").LocalPlayer.Data.Bounty.Value >= 10000000 then
+                    game:GetService("ReplicatedStorage").Remotes.SummonSeaBeast:FireServer()
+                end
+            end)
+            wait(60) -- Delay để tránh spam
+        end
+    end)
+end
+
+-- Tự động đổi server sau khi kill 6 người
+local function AutoHopServer()
+    spawn(function()
+        while _G.AutoHopServer do
+            if _G.KillCount >= 6 then
+                pcall(function()
+                    local servers = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/2753915549/servers/Public?sortOrder=Asc&limit=100"))
+                    for _, server in pairs(servers.data) do
+                        if server.playing < server.maxPlayers then
+                            game:GetService("TeleportService"):TeleportToPlaceInstance(2753915549, server.id)
+                            break
+                        end
+                    end
+                end)
+                _G.KillCount = 0
+            end
+            wait(1)
+        end
+    end)
+end
+
+-- Tự động chọn faction
+local function SetFaction()
+    pcall(function()
+        game:GetService("ReplicatedStorage").Rem Wotes.Faction:FireServer(_G.Faction)
+    end)
+end
+
+-- Tính FPS và thời gian sử dụng
+local function CalculateStats()
+    local fps = 0
+    local lastTime = tick()
+    local frameCount = 0
+    
+    spawn(function()
+        while true do
+            frameCount = frameCount + 1
+            if tick() - lastTime >= 1 then
+                fps = frameCount
+                frameCount = 0
+                lastTime = tick()
+            end
+            wait()
+        end
+    end)
+    
+    return function()
+        local elapsedTime = tick() - _G.StartTime
+        local hours = math.floor(elapsedTime / 3600)
+        local minutes = math.floor((elapsedTime % 3600) / 60)
+        local seconds = math.floor(elapsedTime % 60)
+        return fps, string.format("%02d:%02d:%02d", hours, minutes, seconds)
+    end
+end
+
+local GetStats = CalculateStats()
+
+-- Hiển thị bảng điều khiển
+local function CreateUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AnuraHubUI"
+    screenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 200)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+    frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    frame.BackgroundTransparency = 0.5
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "Anura Hub - Auto Bounty"
+    title.TextColor3 = Color3.fromRGB(255, 0, 0)
+    title.TextScaled = true
+    title.Parent = frame
+    
+    local bountyLabel = Instance.new("TextLabel")
+    bountyLabel.Size = UDim2.new(1, 0, 0, 20)
+    bountyLabel.Position = UDim2.new(0, 0, 0, 30)
+    bountyLabel.BackgroundTransparency = 1
+    bountyLabel.Text = "Current Bounty: 0"
+    bountyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    bountyLabel.TextScaled = true
+    bountyLabel.Parent = frame
+    
+    local totalBountyLabel = Instance.new("TextLabel")
+    totalBountyLabel.Size = UDim2.new(1, 0, 0, 20)
+    totalBountyLabel.Position = UDim2.new(0, 0, 0, 50)
+    totalBountyLabel.BackgroundTransparency = 1
+    totalBountyLabel.Text = "Total Bounty Earned: 0"
+    totalBountyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    totalBountyLabel.TextScaled = true
+    totalBountyLabel.Parent = frame
+    
+    local fpsLabel = Instance.new("TextLabel")
+    fpsLabel.Size = UDim2.new(1, 0, 0, 20)
+    fpsLabel.Position = UDim2.new(0, 0, 0, 70)
+    fpsLabel.BackgroundTransparency = 1
+    fpsLabel.Text = "FPS: 0"
+    fpsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    fpsLabel.TextScaled = true
+    fpsLabel.Parent = frame
+    
+    local timeLabel = Instance.new("TextLabel")
+    timeLabel.Size = UDim2.new(1, 0, 0, 20)
+    timeLabel.Position = UDim2.new(0, 0, 0, 90)
+    timeLabel.BackgroundTransparency = 1
+    timeLabel.Text = "Time Elapsed: 00:00:00"
+    timeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    timeLabel.TextScaled = true
+    timeLabel.Parent = frame
+    
+    local nextPlayerButton = Instance.new("TextButton")
+    nextPlayerButton.Size = UDim2.new(0.8, 0, 0, 30)
+    nextPlayerButton.Position = UDim2.new(0.1, 0, 0, 120)
+    nextPlayerButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    nextPlayerButton.Text = "Next Player"
+    nextPlayerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nextPlayerButton.TextScaled = true
+    nextPlayerButton.Parent = frame
+    
+    -- Cập nhật UI
+    spawn(function()
+        while true do
+            local fps, elapsedTime = GetStats()
+            bountyLabel.Text = "Current Bounty: " .. game:GetService("Players").LocalPlayer.Data.Bounty.Value
+            totalBountyLabel.Text = "Total Bounty Earned: " .. _G.TotalBountyEarned
+            fpsLabel.Text = "FPS: " .. fps
+            timeLabel.Text = "Time Elapsed: " .. elapsedTime
+            wait(1)
+        end
+    end)
+    
+    -- Xử lý nút Next Player
+    nextPlayerButton.MouseButton1Click:Connect(function()
+        _G.TargetPlayer = FindRandomPlayer()
+    end)
+end
+
+-- Main Auto Bounty
+local function StartAutoBounty()
+    _G.AutoBounty = true
+    _G.AutoSkill = true
+    _G.AutoInstinct = true
+    _G.AutoAura = true
+    _G.AutoRaceV3 = true
+    _G.AutoRaceV4 = true
+    _G.AutoSummonSeaBeast = true
+    _G.AutoHopServer = true
+    
+    -- Khởi tạo các tính năng
+    OptimizePerformance()
+    AntiBan()
+    CreateUI()
+    AutoEnableFeatures()
+    AutoSummonSeaBeast()
+    AutoHopServer()
+    SetFaction()
+spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local player = game:GetService("Players").LocalPlayer
+                local character = player.Character or player.CharacterAdded:Wait()
+                
+                -- Tìm người chơi nếu chưa có mục tiêu
+                if not _G.TargetPlayer or not _G.TargetPlayer.Character or _G.TargetPlayer.Character.Humanoid.Health <= 0 then
+                    _G.TargetPlayer = FindRandomPlayer()
+                end
+                
+                -- Di chuyển và tấn công
+                if _G.TargetPlayer and _G.TargetPlayer.Character and _G.TargetPlayer.Character.Humanoid.Health > 0 then
+                    MoveToPlayer(_G.TargetPlayer)
+                    AutoAttack(_G.TargetPlayer)
+                    
+                    -- Kiểm tra nếu giết được người chơi
+                    local oldBounty = player.Data.Bounty.Value
+                    wait(1)
+                    if player.Data.Bounty.Value > oldBounty then
+                        _G.TotalBountyEarned = _G.TotalBountyEarned + (player.Data.Bounty.Value - oldBounty)
+                        _G.KillCount = _G.KillCount + 1
+                    end
+                end
+            end)
+            wait(0.1)
+        end
+    end)
+end
+
+-- Khởi động script
+StartAutoBounty()
