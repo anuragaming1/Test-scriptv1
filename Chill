@@ -1,0 +1,338 @@
+--[[
+  ANURA AUTO BOUNTY PREMIUM
+  Features:
+  - Smooth flying to targets
+  - Full skill rotation
+  - Advanced anti-ban
+  - FPS optimization
+  - Smart aimbot
+  - Auto server hop
+]]
+
+-- Services
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+
+-- Configuration
+_G.Config = {
+    Team = "Pirates",                -- "Pirates" or "Marines"
+    AttackRange = 25,                -- Optimal attack distance
+    FlySpeed = 100,                  -- Movement speed
+    SkillCooldown = 0.2,             -- Delay between skills
+    AutoHopAfterKills = 5,           -- Kills before server hop
+    FPSBoost = true,                 -- Enable performance optimization
+    AntiBan = true,                  -- Enable anti-ban systems
+    Aimbot = true,                   -- Enable precise aiming
+    AutoBuffs = true,                -- Auto enable buffs (Buso, Ken, etc.)
+    DebugMode = false                -- Show debug information
+}
+
+-- Variables
+local LocalPlayer = Players.LocalPlayer
+local CurrentTarget = nil
+local BountyKills = 0
+local TotalBounty = 0
+local KillsBeforeHop = 0
+local StartTime = tick()
+local CurrentFPS = 0
+local SkillRotation = {"Z", "X", "C", "V", "F"}
+local BuffsActive = false
+
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 300, 0, 180)
+MainFrame.Position = UDim2.new(0.5, -150, 0, 10)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+MainFrame.BackgroundTransparency = 0.3
+MainFrame.BorderSizePixel = 0
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Text = "ANURA PREMIUM"
+Title.TextColor3 = Color3.fromRGB(0, 255, 255)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Position = UDim2.new(0, 0, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.SourceSansBold
+
+local Stats = {
+    Kills = Instance.new("TextLabel", MainFrame),
+    Bounty = Instance.new("TextLabel", MainFrame),
+    Time = Instance.new("TextLabel", MainFrame),
+    FPS = Instance.new("TextLabel", MainFrame)
+}
+
+local yPos = 30
+for name, label in pairs(Stats) do
+    label.Text = name..": 0"
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.Position = UDim2.new(0, 0, 0, yPos)
+    label.BackgroundTransparency = 1
+    yPos = yPos + 20
+end
+
+local ToggleButton = Instance.new("TextButton", MainFrame)
+ToggleButton.Text = "START"
+ToggleButton.Size = UDim2.new(0.4, 0, 0, 25)
+ToggleButton.Position = UDim2.new(0.1, 0, 0, yPos)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+
+local NextTargetButton = Instance.new("TextButton", MainFrame)
+NextTargetButton.Text = "NEXT TARGET"
+NextTargetButton.Size = UDim2.new(0.4, 0, 0, 25)
+NextTargetButton.Position = UDim2.new(0.5, 0, 0, yPos)
+NextTargetButton.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+
+-- Optimize game performance
+local function OptimizeGame()
+    if not _G.Config.FPSBoost then return end
+    
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 12
+    
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.Plastic
+            v.Reflectance = 0
+        elseif v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Sparkles") then
+            v.Enabled = false
+        end
+    end
+end
+
+-- Anti-ban system
+local function SetupAntiBan()
+    if not _G.Config.AntiBan then return end
+    
+    -- Random movements
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("Humanoid") then
+                    char.Humanoid:MoveTo(char.HumanoidRootPart.Position + 
+                        Vector3.new(math.random(-10, 10), 0, math.random(-10, 10)))
+                end
+            end)
+            wait(math.random(15, 30))
+        end
+    end)
+    
+    -- Random chats
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(
+                    "Farming bounty... "..math.random(1, 100), "All"
+                )
+            end)
+            wait(math.random(30, 60))
+        end
+    end)
+    
+    -- Random team switching
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", 
+                    math.random(1, 2) == 1 and "Pirates" or "Marines")
+            end)
+            wait(math.random(120, 240))
+        end
+    end)
+end
+
+-- Find best target
+local function FindTarget()
+    local players = Players:GetPlayers()
+    local bestTarget = nil
+    local highestBounty = 0
+    
+    for _, player in pairs(players) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
+            local bounty = player:FindFirstChild("Data") and player.Data:FindFirstChild("Bounty") and player.Data.Bounty.Value or 0
+            if bounty > highestBounty and player.Character.Humanoid.Health > 0 then
+                bestTarget = player
+                highestBounty = bounty
+            end
+        end
+    end
+    
+    return bestTarget or (players[math.random(2, #players)] and players[math.random(2, #players)].Character and players[math.random(2, #players)] or nil)
+end
+
+-- Smooth fly to target
+local function FlyToTarget(target)
+    if not target or not target.Character then return end
+    
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local targetHrp = target.Character:FindFirstChild("HumanoidRootPart")
+    if not targetHrp then return end
+    
+    local hrp = char.HumanoidRootPart
+    local distance = (targetHrp.Position - hrp.Position).Magnitude
+    
+    -- Calculate direction with prediction
+    local targetVelocity = targetHrp.Velocity
+    local prediction = targetVelocity * (distance / _G.Config.FlySpeed) * 0.3
+    local targetPosition = targetHrp.Position + prediction
+    
+    -- Smooth movement
+    if distance > _G.Config.AttackRange then
+        local direction = (targetPosition - hrp.Position).Unit
+        hrp.Velocity = direction * _G.Config.FlySpeed
+    else
+        hrp.Velocity = Vector3.new(0, 0, 0)
+    end
+    
+    -- Aimbot (face target)
+    if _G.Config.Aimbot then
+        hrp.CFrame = CFrame.new(hrp.Position, targetHrp.Position)
+    end
+end
+
+-- Activate buffs
+local function ActivateBuffs()
+    if not _G.Config.AutoBuffs or BuffsActive then return end
+    
+    pcall(function()
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("KenTalk", "Start")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("AwakeningChanger", "V3")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("AwakeningChanger", "V4")
+        BuffsActive = true
+    end)
+end
+
+-- Use all skills
+local function UseAllSkills()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("Humanoid") then return end
+    
+    ActivateBuffs()
+    
+    -- Skill rotation
+    for _, skill in pairs(SkillRotation) do
+        pcall(function()
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("ActivateAbility", skill)
+        end)
+        wait(_G.Config.SkillCooldown)
+    end
+    
+    -- Basic attacks
+    for i = 1, 5 do
+        VirtualUser:ClickButton1(Vector2.new(math.random(500, 600), math.random(300, 400)))
+        wait(0.1)
+    end
+end
+
+-- Server hop function
+local function HopServer()
+    pcall(function()
+        local servers = {}
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet(
+                "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"
+            ))
+        end)
+        
+        if success and result and result.data then
+            for _, server in pairs(result.data) do
+                if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                    table.insert(servers, server)
+                end
+            end
+            
+            if #servers > 0 then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)].id)
+            end
+        end
+    end)
+end
+
+-- Main farming loop
+local function FarmingLoop()
+    OptimizeGame()
+    SetupAntiBan()
+    
+    while _G.AutoBounty do
+        pcall(function()
+            -- Update UI
+            Stats.Kills.Text = "Kills: "..BountyKills
+            Stats.Bounty.Text = "Bounty: "..(LocalPlayer.Data.Bounty.Value or 0)
+            Stats.Time.Text = "Time: "..math.floor(tick() - StartTime).."s"
+            Stats.FPS.Text = "FPS: "..CurrentFPS
+            
+            -- Find target if none
+            if not CurrentTarget or not CurrentTarget.Character or CurrentTarget.Character.Humanoid.Health <= 0 then
+                CurrentTarget = FindTarget()
+                if not CurrentTarget then
+                    wait(1)
+                    return
+                end
+            end
+            
+            -- Move to target
+            FlyToTarget(CurrentTarget)
+            
+            -- Attack if in range
+            local distance = (CurrentTarget.Character.HumanoidRootPart.Position - 
+                             LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if distance <= _G.Config.AttackRange then
+                UseAllSkills()
+            end
+            
+            -- Check for kill
+            if CurrentTarget.Character.Humanoid.Health <= 0 then
+                BountyKills = BountyKills + 1
+                TotalBounty = TotalBounty + (CurrentTarget.Data.Bounty.Value or 10000)
+                KillsBeforeHop = KillsBeforeHop + 1
+                
+                if KillsBeforeHop >= _G.Config.AutoHopAfterKills then
+                    HopServer()
+                    KillsBeforeHop = 0
+                end
+            end
+        end)
+        
+        wait(0.1)
+    end
+end
+
+-- Toggle button
+ToggleButton.MouseButton1Click:Connect(function()
+    _G.AutoBounty = not _G.AutoBounty
+    ToggleButton.Text = _G.AutoBounty and "STOP" or "START"
+    ToggleButton.BackgroundColor3 = _G.AutoBounty and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(0, 200, 0)
+    
+    if _G.AutoBounty then
+        spawn(FarmingLoop)
+    end
+end)
+
+-- Next target button
+NextTargetButton.MouseButton1Click:Connect(function()
+    CurrentTarget = FindTarget()
+end)
+
+-- FPS counter
+RunService.RenderStepped:Connect(function(delta)
+    CurrentFPS = math.floor(1/delta)
+end)
+
+-- Initial setup
+ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", _G.Config.Team)
+print("ANURA PREMIUM LOADED | "..os.date("%X"))
