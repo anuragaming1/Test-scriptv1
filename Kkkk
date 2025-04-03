@@ -1,0 +1,282 @@
+-- Khai báo biến toàn cục
+_G.AutoBounty = false
+_G.Config = {
+    Team = "Pirates", -- "Pirates" hoặc "Marines"
+    FPSBoost = true,
+    AntiBan = true,
+    AttackRange = 20, -- Khoảng cách tấn công
+    SkillCooldown = 0.3, -- Thời gian chờ giữa các skill
+    AutoHopAfterKills = 6 -- Số kill trước khi đổi server
+}
+
+-- Dịch vụ cơ bản
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+
+-- Biến theo dõi
+local BountyKills = 0
+local TotalBounty = 0
+local StartTime = tick()
+local Kills = 0
+local CurrentFPS = 0
+
+-- Log hệ thống
+local Logs = {}
+local function AddLog(message)
+    table.insert(Logs, "[" .. os.date("%H:%M:%S") .. "] " .. message)
+    if #Logs > 50 then table.remove(Logs, 1) end
+end
+
+-- Giao diện đơn giản
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.IgnoreGuiInset = true
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 300, 0, 180)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -90)
+MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 50)
+MainFrame.BackgroundTransparency = 0.3
+MainFrame.BorderSizePixel = 0
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Text = "ANURA AUTO BOUNTY"
+Title.TextColor3 = Color3.fromRGB(0, 255, 255)
+Title.TextSize = 20
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Position = UDim2.new(0, 0, 0, 0)
+Title.BackgroundTransparency = 1
+
+local BountyLabel = Instance.new("TextLabel", MainFrame)
+BountyLabel.Text = "Bounty Kills: 0"
+BountyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+BountyLabel.TextSize = 16
+BountyLabel.Size = UDim2.new(1, 0, 0, 20)
+BountyLabel.Position = UDim2.new(0, 0, 0, 30)
+BountyLabel.BackgroundTransparency = 1
+
+local CurrentBountyLabel = Instance.new("TextLabel", MainFrame)
+CurrentBountyLabel.Text = "Current Bounty: 0"
+CurrentBountyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+CurrentBountyLabel.TextSize = 16
+CurrentBountyLabel.Size = UDim2.new(1, 0, 0, 20)
+CurrentBountyLabel.Position = UDim2.new(0, 0, 0, 50)
+CurrentBountyLabel.BackgroundTransparency = 1
+
+local FPSLabel = Instance.new("TextLabel", MainFrame)
+FPSLabel.Text = "FPS: 0"
+FPSLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+FPSLabel.TextSize = 16
+FPSLabel.Size = UDim2.new(1, 0, 0, 20)
+FPSLabel.Position = UDim2.new(0, 0, 0, 70)
+FPSLabel.BackgroundTransparency = 1
+
+local TimeLabel = Instance.new("TextLabel", MainFrame)
+TimeLabel.Text = "Time: 0s"
+TimeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TimeLabel.TextSize = 16
+TimeLabel.Size = UDim2.new(1, 0, 0, 20)
+TimeLabel.Position = UDim2.new(0, 0, 0, 90)
+TimeLabel.BackgroundTransparency = 1
+
+local NextPlayerButton = Instance.new("TextButton", MainFrame)
+NextPlayerButton.Text = "Next Target"
+NextPlayerButton.Size = UDim2.new(0.8, 0, 0, 30)
+NextPlayerButton.Position = UDim2.new(0.1, 0, 0, 120)
+NextPlayerButton.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+NextPlayerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- Chọn mục tiêu ngẫu nhiên
+local function GetRandomPlayer()
+    local players = Players:GetPlayers()
+    if #players < 2 then return nil end
+    
+    local validTargets = {}
+    for _, player in pairs(players) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            table.insert(validTargets, player)
+        end
+    end
+    
+    if #validTargets > 0 then
+        local target = validTargets[math.random(1, #validTargets)]
+        AddLog("Selected target: " .. target.Name)
+        return target
+    end
+    return nil
+end
+
+-- Chống ban cơ bản
+local function AntiBan()
+    if not _G.Config.AntiBan then return end
+    
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                -- Giả lập hành vi người chơi
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new(math.random(100, 900), math.random(100, 900)))
+                
+                -- Random di chuyển
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("Humanoid") then
+                    char.Humanoid:MoveTo(char.HumanoidRootPart.Position + Vector3.new(
+                        math.random(-10, 10), 0, math.random(-10, 10)
+                    ))
+                end
+                
+                -- Gửi tin nhắn ngẫu nhiên
+                ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(
+                    "Playing normally...", "All"
+                )
+            end)
+            wait(math.random(15, 30))
+        end
+    end)
+end
+
+-- Tối ưu FPS
+local function OptimizeGame()
+    if not _G.Config.FPSBoost then return end
+    
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level03
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 1000
+        
+        for _, v in pairs(Workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.Material = Enum.Material.Plastic
+                v.Reflectance = 0
+            end
+        end
+    end)
+end
+
+-- Kiểm tra khoảng cách
+local function IsInRange(targetPos, range)
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    return (targetPos - hrp.Position).Magnitude <= range
+end
+
+-- Di chuyển đến mục tiêu (không dùng bypass)
+local function MoveToTarget(target)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local targetPos = target.Character.HumanoidRootPart.Position
+        if not IsInRange(targetPos, _G.Config.AttackRange) then
+            humanoid:MoveTo(targetPos)
+        end
+    end
+end
+
+-- Sử dụng kỹ năng
+local function UseSkills(target)
+    if not target.Character then return end
+    
+    local skills = {"Z", "X", "C", "V", "F"}
+    for _, key in pairs(skills) do
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("ActivateAbility", key)
+        wait(_G.Config.SkillCooldown)
+    end
+    
+    -- Đánh thường
+    VirtualUser:ClickButton1(Vector2.new(math.random(100, 900), math.random(100, 900)))
+end
+
+-- Đổi server
+local function HopServer()
+    pcall(function()
+        local servers = HttpService:JSONDecode(game:HttpGet(
+            "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"
+        ))
+        
+        for _, server in pairs(servers.data) do
+            if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id)
+                break
+            end
+        end
+    end)
+end
+
+-- Vòng lặp chính
+local function MainLoop()
+    local currentTarget = GetRandomPlayer()
+    
+    AntiBan()
+    OptimizeGame()
+    
+    while _G.AutoBounty do
+        pcall(function()
+            -- Cập nhật UI
+            BountyLabel.Text = "Bounty Kills: "..BountyKills
+            CurrentBountyLabel.Text = "Current Bounty: "..(LocalPlayer.Data.Bounty.Value or 0)
+            FPSLabel.Text = "FPS: "..math.floor(CurrentFPS)
+            TimeLabel.Text = "Time: "..math.floor(tick()-StartTime).."s"
+            
+            -- Kiểm tra và chọn mục tiêu
+            if not currentTarget or not currentTarget.Character or currentTarget.Character.Humanoid.Health <= 0 then
+                currentTarget = GetRandomPlayer()
+                if not currentTarget then
+                    wait(1)
+                    return
+                end
+            end
+            
+            -- Di chuyển và tấn công
+            MoveToTarget(currentTarget)
+            if IsInRange(currentTarget.Character.HumanoidRootPart.Position, _G.Config.AttackRange) then
+                UseSkills(currentTarget)
+            end
+            
+            -- Xử lý khi hạ mục tiêu
+            if currentTarget.Character.Humanoid.Health <= 0 then
+                BountyKills = BountyKills + 1
+                TotalBounty = TotalBounty + 10000
+                Kills = Kills + 1
+                AddLog("Defeated "..currentTarget.Name)
+                
+                -- Đổi server sau khi đạt đủ kill
+                if Kills >= _G.Config.AutoHopAfterKills then
+                    HopServer()
+                    Kills = 0
+                end
+            end
+        end)
+        wait(0.1)
+    end
+end
+
+-- Xử lý nút Next Player
+NextPlayerButton.MouseButton1Click:Connect(function()
+    local newTarget = GetRandomPlayer()
+    if newTarget then
+        AddLog("Manually switched to "..newTarget.Name)
+    end
+end)
+
+-- Đo FPS
+RunService.RenderStepped:Connect(function(delta)
+    CurrentFPS = 1/delta
+end)
+
+-- Khởi động
+_G.AutoBounty = true
+spawn(MainLoop)
+AddLog("Script started successfully!")
