@@ -1,0 +1,723 @@
+-- Khai báo biến toàn cục
+_G.AutoBounty = false
+_G.Config = {
+    TpBypass = true,
+    Team = "Pirates",
+    FPSBoost = true,
+    AntiBan = true,
+    Platform = "Auto",
+    KaitunMode = true,
+    AutoStats = true,
+    AutoQuest = true,
+    AutoFruitMastery = true,
+    AutoChest = true,
+    AutoLegendarySword = true,
+    AutoMirageIsland = true,
+    AutoSeaEvents = true,
+    AutoAwakenFruit = true,    -- Tự động awaken trái
+    AutoFarmMaterial = true,   -- Tự động farm vật liệu
+    AutoEliteHunter = true,    -- Tự động săn Elite Hunter
+    AutoRaid = true,           -- Tự động đánh Raid
+    LogEnabled = true          -- Bật hệ thống log
+}
+
+-- Dịch vụ cơ bản
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+
+-- Biến theo dõi
+local BountyKills = 0
+local TotalBounty = 0
+local StartTime = tick()
+local Kills = 0
+local CurrentFPS = 0
+local MasteryPoints = 0
+local QuestCompleted = 0
+local ChestsCollected = 0
+local LegendarySwordsBought = 0
+local MirageFound = false
+local SeaEventsCompleted = 0
+local SeaBeastSummoned = false
+local MaterialsCollected = 0
+local EliteKills = 0
+local RaidsCompleted = 0
+local AwakenedFruits = 0
+
+-- Log hệ thống
+local Logs = {}
+local function AddLog(message)
+    if _G.Config.LogEnabled then
+        table.insert(Logs, "[" .. os.date("%H:%M:%S") .. "] " .. message)
+        if #Logs > 100 then table.remove(Logs, 1) end
+    end
+end
+
+-- Phát hiện nền tảng
+local function DetectPlatform()
+    if _G.Config.Platform == "Auto" then
+        if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+            return "Mobile"
+        else
+            return "PC"
+        end
+    end
+    return _G.Config.Platform
+end
+local Platform = DetectPlatform()
+
+-- Giao diện
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.IgnoreGuiInset = true
+
+local Title = Instance.new("TextLabel", ScreenGui)
+Title.Text = "Anura Hub"
+Title.TextColor3 = Color3.fromRGB(255, 0, 0)
+Title.TextSize = Platform == "Mobile" and 20 or 30
+Title.Position = UDim2.new(0.5, -100, 0, 10)
+Title.BackgroundTransparency = 1
+
+local SubTitle = Instance.new("TextLabel", ScreenGui)
+SubTitle.Text = "Auto Bounty"
+SubTitle.TextColor3 = Color3.fromRGB(0, 255, 0)
+SubTitle.TextSize = Platform == "Mobile" and 18 or 25
+SubTitle.Position = UDim2.new(0.5, -80, 0, Platform == "Mobile" and 30 or 40)
+SubTitle.BackgroundTransparency = 1
+
+local ControlPanel = Instance.new("ImageLabel", ScreenGui)
+ControlPanel.Size = Platform == "Mobile" and UDim2.new(0, 300, 0, 400) or UDim2.new(0, 500, 0, 600)
+ControlPanel.Position = UDim2.new(0.5, -(ControlPanel.Size.X.Offset / 2), 0.5, -(ControlPanel.Size.Y.Offset / 2))
+ControlPanel.Image = "rbxassetid://136052983037396"
+ControlPanel.BackgroundTransparency = 1
+
+-- Tạo nhãn cho giao diện
+local function CreateLabel(name, text, posY)
+    local label = Instance.new("TextLabel", ControlPanel)
+    label.Name = name
+    label.Text = text
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Position = UDim2.new(0.1, 0, posY, 0)
+    label.Size = UDim2.new(0.8, 0, 0.04, 0)
+    label.TextScaled = true
+    return label
+end
+
+local BountyLabel = CreateLabel("BountyLabel", "Total Bounty Kills: 0", 0.05)
+local CurrentBountyLabel = CreateLabel("CurrentBountyLabel", "Current Bounty: 0", 0.09)
+local FPSLabel = CreateLabel("FPSLabel", "FPS: 0", 0.13)
+local TimeLabel = CreateLabel("TimeLabel", "Time Running: 0s", 0.17)
+local MasteryLabel = CreateLabel("MasteryLabel", "Mastery Points: 0", 0.21)
+local QuestLabel = CreateLabel("QuestLabel", "Quests Completed: 0", 0.25)
+local ChestLabel = CreateLabel("ChestLabel", "Chests Collected: 0", 0.29)
+local SwordLabel = CreateLabel("SwordLabel", "Legendary Swords: 0", 0.33)
+local MirageLabel = CreateLabel("MirageLabel", "Mirage Island: Not Found", 0.37)
+local SeaEventLabel = CreateLabel("SeaEventLabel", "Sea Events: 0", 0.41)
+local MaterialLabel = CreateLabel("MaterialLabel", "Materials Collected: 0", 0.45)
+local EliteLabel = CreateLabel("EliteLabel", "Elite Kills: 0", 0.49)
+local RaidLabel = CreateLabel("RaidLabel", "Raids Completed: 0", 0.53)
+local AwakenLabel = CreateLabel("AwakenLabel", "Awakened Fruits: 0", 0.57)
+
+local NextPlayerButton = Instance.new("TextButton", ControlPanel)
+NextPlayerButton.Text = "Next Player"
+NextPlayerButton.Size = UDim2.new(0.3, 0, 0.1, 0)
+NextPlayerButton.Position = UDim2.new(0.35, 0, 0.85, 0)
+NextPlayerButton.BackgroundColor3 = Color3.new(0, 0.5, 1)
+NextPlayerButton.TextColor3 = Color3.new(1, 1, 1)
+NextPlayerButton.TextScaled = true
+
+-- Chọn mục tiêu ngẫu nhiên
+local function GetRandomPlayer()
+    local players = Players:GetPlayers()
+    if #players < 2 then return nil end
+    local target = players[math.random(2, #players)]
+    AddLog("Selected new target: " .. target.Name)
+    return target
+end
+
+-- Chống ban nâng cao
+local function AntiBan()
+    if not _G.Config.AntiBan then return end
+    
+    -- Layer 1: Giả lập hành vi người chơi
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                if Platform == "PC" then
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton2(Vector2.new(math.random(0, 1000), math.random(0, 1000)))
+                    VirtualUser:MoveMouse(Vector2.new(math.random(0, 1000), math.random(0, 1000)))
+                else
+                    VirtualUser:Button2Down(Vector2.new(math.random(200, 800), math.random(200, 800)))
+                    wait(0.1)
+                    VirtualUser:Button2Up(Vector2.new(math.random(200, 800), math.random(200, 800)))
+                end
+                
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("Humanoid") then
+                    char.Humanoid:MoveTo(char.HumanoidRootPart.Position + Vector3.new(
+                        math.random(-15, 15), 0, math.random(-15, 15)
+                    ))
+                end
+                
+                ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(
+                    "Farming " .. math.random(1, 1000), "All"
+                )
+                AddLog("Simulated player behavior")
+            end)
+            wait(math.random(10, 25))
+        end
+    end)
+    
+    -- Layer 2: Random hóa team và hoạt động
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local randomTeam = math.random(1, 2) == 1 and "Pirates" or "Marines"
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", randomTeam)
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("CheckCombat", LocalPlayer)
+                AddLog("Randomized team to: " .. randomTeam)
+            end)
+            wait(math.random(30, 60))
+        end
+    end)
+
+-- Layer 3: Chống kick
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("Ping")
+                AddLog("Sent ping to server")
+            end)
+            wait(120)
+        end
+    end)
+    
+    -- Layer 4: Giả lập hành vi phức tạp
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    for i = 1, math.random(3, 6) do
+                        char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(
+                            math.random(-5, 5), math.random(0, 3), math.random(-5, 5)
+                        )
+                        wait(math.random(0.5, 1.5))
+                    end
+                    AddLog("Simulated complex movement")
+                end
+            end)
+            wait(math.random(45, 90))
+        end
+    end)
+end
+
+-- Tối ưu FPS
+local function OptimizeGame()
+    if not _G.Config.FPSBoost then return end
+    pcall(function()
+        settings().Rendering.QualityLevel = Platform == "Mobile" and "Level01" or "Level03"
+        Lighting.FogEnd = Platform == "Mobile" and 500 or 2000
+        Lighting.GlobalShadows = Platform == "Mobile" and false or true
+        Lighting.Brightness = Platform == "Mobile" and 0.5 or 1
+        Lighting.ClockTime = 12
+        
+        for _, v in pairs(Workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0
+                v.CastShadow = false
+                v.Anchored = v.Anchored or false
+            elseif v:IsA("ParticleEmitter") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+                v.Enabled = false
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                v.Transparency = 1
+            end
+        end
+        
+        for _, v in pairs(Lighting:GetChildren()) do
+            if v:IsA("PostEffect") then
+                v.Enabled = false
+            end
+        end
+        AddLog("Optimized game performance")
+    end)
+end
+
+-- Tự động bật tính năng
+local function AutoEnableFeatures()
+    pcall(function()
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyHaki", "Observation")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyHaki", "Enhancement")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("RaceV3")
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("RaceV4")
+        AddLog("Enabled Haki and Race features")
+    end)
+end
+
+-- Tấn công bằng kỹ năng
+local function UseSkills(target)
+    local char = LocalPlayer.Character
+    if not char or not target.Character then return end
+    
+    local function Attack(key, type)
+        if Platform == "PC" then
+            VirtualUser:ClickButton1(Vector2.new(math.random(0, 1000), math.random(0, 1000)))
+        else
+            VirtualUser:Button1Down(Vector2.new(math.random(200, 800), math.random(200, 800)))
+            wait(0.1)
+            VirtualUser:Button1Up(Vector2.new(math.random(200, 800), math.random(200, 800)))
+        end
+        ReplicatedStorage.Remotes.CommF_:InvokeServer(type, key)
+        wait(0.15)
+    end
+    
+    for _, key in pairs({"Z", "X", "C"}) do Attack(key, "Melee") end
+    for _, key in pairs({"Z", "X", "C", "V", "F"}) do Attack(key, "Fruit") end
+    for _, key in pairs({"Z", "X"}) do Attack(key, "Sword") end
+    for _, key in pairs({"Z", "X"}) do Attack(key, "Gun") end
+    
+    for i = 1, 5 do
+        if Platform == "PC" then
+            VirtualUser:ClickButton1(Vector2.new(math.random(0, 1000), math.random(0, 1000)))
+        else
+            VirtualUser:Button1Down(Vector2.new(math.random(200, 800), math.random(200, 800)))
+            wait(0.1)
+            VirtualUser:Button1Up(Vector2.new(math.random(200, 800), math.random(200, 800)))
+        end
+        wait(0.1)
+    end
+    AddLog("Used skills on " .. target.Name)
+end
+
+-- Tự động nâng stats
+local function AutoStats()
+    if not _G.Config.AutoStats then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local stats = {"Melee", "Defense", "Sword", "Gun", "Demon Fruit"}
+                for _, stat in pairs(stats) do
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", stat, 10)
+                    wait(0.2)
+                end
+                AddLog("Upgraded stats")
+            end)
+            wait(60)
+        end
+    end)
+end
+
+-- Tự động làm quest
+local function AutoQuest()
+    if not _G.Config.AutoQuest then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", "BartiloQuest", 1)
+                    for _, npc in pairs(Workspace.NPCs:GetChildren()) do
+                        if npc.Name:find("Bartilo") and npc:FindFirstChild("HumanoidRootPart") then
+                            char.HumanoidRootPart.CFrame = npc.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                            wait(1)
+                            ReplicatedStorage.Remotes.CommF_:InvokeServer("QuestProgress", "BartiloQuest", 1)
+                            QuestCompleted = QuestCompleted + 1
+                            AddLog("Completed Bartilo Quest")
+                            break
+                        end
+                    end
+                end
+            end)
+            wait(10)
+        end
+    end)
+end
+
+-- Tự động farm mastery trái
+local function AutoFruitMastery()
+    if not _G.Config.AutoFruitMastery then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    for _, enemy in pairs(Workspace.Enemies:GetChildren()) do
+                        if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                            char.HumanoidRootPart.CFrame = enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                            for _, key in pairs({"Z", "X", "C", "V", "F"}) do
+                                ReplicatedStorage.Remotes.CommF_:InvokeServer("Fruit", key)
+                                wait(0.2)
+                            end
+                            MasteryPoints = MasteryPoints + 1
+                            AddLog("Farmed mastery on " .. enemy.Name)
+                            break
+                        end
+                    end
+                end
+            end)
+            wait(5)
+        end
+    end)
+end
+
+-- Tự động farm chest
+local function AutoChest()
+    if not _G.Config.AutoChest then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    for _, chest in pairs(Workspace:GetChildren()) do
+                        if chest.Name:match("Chest") then
+                            char.HumanoidRootPart.CFrame = chest.CFrame * CFrame.new(0, 5, 0)
+                            wait(0.5)
+                            ReplicatedStorage.Remotes.CommF_:InvokeServer("CollectChest", chest)
+                            ChestsCollected = ChestsCollected + 1
+                            AddLog("Collected chest: " .. chest.Name)
+                            chest:Destroy()
+                            break
+                        end
+                    end
+                end
+            end)
+            wait(3)
+        end
+    end)
+end
+
+-- Tự động mua kiếm huyền thoại
+local function AutoLegendarySword()
+    if not _G.Config.AutoLegendarySword then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local swords = {"Shisui", "Wando", "Saddi"}
+                for _, sword in pairs(swords) do
+                    local result = ReplicatedStorage.Remotes.CommF_:InvokeServer("LegendarySwordDealer", "Buy", sword)
+                    if result == true then
+                        LegendarySwordsBought = LegendarySwordsBought + 1
+                        AddLog("Bought legendary sword: " .. sword)
+                        break
+                    end
+                    wait(1)
+                end
+            end)
+            wait(300)
+        end
+    end)
+end
+
+-- Tự động tìm Mirage Island
+local function AutoMirageIsland()
+    if not _G.Config.AutoMirageIsland then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") and not MirageFound then
+                    for _, island in pairs(Workspace:GetChildren()) do
+                        if island.Name == "Mirage Island" then
+                            char.HumanoidRootPart.CFrame = island:FindFirstChild("Root").CFrame * CFrame.new(0, 50, 0)
+                            MirageFound = true
+                            AddLog("Found Mirage Island")
+                            break
+                        end
+                    end
+                    if not MirageFound then
+                        char.HumanoidRootPart.CFrame = CFrame.new(
+                            math.random(-5000, 5000), 1000, math.random(-5000, 5000)
+                        )
+                    end
+                end
+            end)
+            wait(10)
+        end
+    end)
+end
+
+-- Tự động tham gia Sea Events
+local function AutoSeaEvents()
+    if not _G.Config.AutoSeaEvents then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    for _, event in pairs(Workspace.SeaBeasts:GetChildren()) do
+                        if event:FindFirstChild("HumanoidRootPart") then
+                            char.HumanoidRootPart.CFrame = event.HumanoidRootPart.CFrame * CFrame.new(0, 20, 0)
+                            for _, key in pairs({"Z", "X", "C", "V", "F"}) do
+                                ReplicatedStorage.Remotes.CommF_:InvokeServer("Fruit", key)
+                                wait(0.2)
+                            end
+                            if event.Humanoid.Health <= 0 then
+                                SeaEventsCompleted = SeaEventsCompleted + 1
+                                AddLog("Completed Sea Event")
+                            end
+                        end
+                    end
+                end
+            end)
+            wait(15)
+        end
+    end)
+end
+
+-- Tự động awaken trái
+local function AutoAwakenFruit()
+    if not _G.Config.AutoAwakenFruit then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("Awakener", "Check")
+                    local canAwaken = ReplicatedStorage.Remotes.CommF_:InvokeServer("Awakener", "Awaken")
+                    if canAwaken == true then
+                        AwakenedFruits = AwakenedFruits + 1
+                        AddLog("Awakened fruit")
+                    end
+                end
+            end)
+            wait(600) -- Kiểm tra mỗi 10 phút
+        end
+    end)
+end
+
+-- Tự động farm vật liệu
+local function AutoFarmMaterial()
+    if not _G.Config.AutoFarmMaterial then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    for _, enemy in pairs(Workspace.Enemies:GetChildren()) do
+                        if enemy.Name:find("Pirate") or enemy.Name:find("Bandit") then
+                            char.HumanoidRootPart.CFrame = enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                            for i = 1, 5 do
+                                VirtualUser:ClickButton1(Vector2.new(math.random(0, 1000), math.random(0, 1000)))
+                                wait(0.2)
+                            end
+                            if enemy.Humanoid.Health <= 0 then
+                                MaterialsCollected = MaterialsCollected + math.random(1, 3)
+                                AddLog("Collected materials from " .. enemy.Name)
+                            end
+                            break
+                        end
+                    end
+                end
+            end)
+            wait(5)
+        end
+    end)
+end
+
+-- Tự động săn Elite Hunter
+local function AutoEliteHunter()
+    if not _G.Config.AutoEliteHunter then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("EliteHunter")
+                    for _, elite in pairs(Workspace.Enemies:GetChildren()) do
+                        if elite.Name:find("Elite") then
+                            char.HumanoidRootPart.CFrame = elite.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                            for _, key in pairs({"Z", "X", "C"}) do
+                                ReplicatedStorage.Remotes.CommF_:InvokeServer("Melee", key)
+                                wait(0.2)
+                            end
+                            if elite.Humanoid.Health <= 0 then
+                                EliteKills = EliteKills + 1
+                                AddLog("Killed Elite: " .. elite.Name)
+                            end
+                            break
+                        end
+                    end
+                end
+            end)
+            wait(20)
+        end
+    end)
+end
+
+-- Tự động đánh Raid
+local function AutoRaid()
+    if not _G.Config.AutoRaid then return end
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("Raids", "StartRaid", "Flame")
+                    wait(5)
+                    for _, enemy in pairs(Workspace.Enemies:GetChildren()) do
+                        if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                            char.HumanoidRootPart.CFrame = enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                            for _, key in pairs({"Z", "X", "C", "V", "F"}) do
+                                ReplicatedStorage.Remotes.CommF_:InvokeServer("Fruit", key)
+                                wait(0.2)
+                            end
+                        end
+                    end
+                    local raidComplete = ReplicatedStorage.Remotes.CommF_:InvokeServer("Raids", "CheckCompletion")
+                    if raidComplete then
+                        RaidsCompleted = RaidsCompleted + 1
+                        AddLog("Completed Raid")
+                    end
+                end
+            end)
+            wait(900) -- Đánh raid mỗi 15 phút
+        end
+    end)
+end
+
+-- Main Loop
+spawn(function()
+    _G.AutoBounty = true
+    local currentTarget = GetRandomPlayer()
+    
+    -- Khởi động tất cả tính năng
+    AntiBan()
+    AutoStats()
+    AutoQuest()
+    AutoFruitMastery()
+    AutoChest()
+    AutoLegendarySword()
+    AutoMirageIsland()
+    AutoSeaEvents()
+    AutoAwakenFruit()
+    AutoFarmMaterial()
+    AutoEliteHunter()
+    AutoRaid()
+while _G.AutoBounty do
+        pcall(function()
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") and currentTarget and currentTarget.Character then
+                -- Cập nhật giao diện
+                BountyLabel.Text = "Total Bounty Kills: " .. BountyKills
+                CurrentBountyLabel.Text = "Current Bounty: " .. TotalBounty
+                FPSLabel.Text = "FPS: " .. math.floor(CurrentFPS)
+                TimeLabel.Text = "Time Running: " .. math.floor(tick() - StartTime) .. "s"
+                MasteryLabel.Text = "Mastery Points: " .. MasteryPoints
+                QuestLabel.Text = "Quests Completed: " .. QuestCompleted
+                ChestLabel.Text = "Chests Collected: " .. ChestsCollected
+                SwordLabel.Text = "Legendary Swords: " .. LegendarySswordBought
+                MirageLabel.Text = "Mirage Island: " .. (MirageFound and "Found" or "Not Found")
+                SeaEventLabel.Text = "Sea Events: " .. SeaEventsCompleted
+                MaterialLabel.Text = "Materials Collected: " .. MaterialsCollected
+                EliteLabel.Text = "Elite Kills: " .. EliteKills
+                RaidLabel.Text = "Raids Completed: " .. RaidsCompleted
+                AwakenLabel.Text = "Awakened Fruits: " .. AwakenedFruits
+                
+                OptimizeGame()
+                AutoEnableFeatures()
+                
+                if _G.Config.TpBypass then
+                    char.HumanoidRootPart.CFrame = currentTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                else
+                    char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame:Lerp(
+                        currentTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0), Platform == "Mobile" and 0.05 or 0.1
+                    )
+                end
+                
+                UseSkills(currentTarget)
+                
+                if currentTarget.Character.Humanoid.Health <= 0 then
+                    BountyKills = BountyKills + 1
+                    TotalBounty = TotalBounty + 10000
+                    Kills = Kills + 1
+                    currentTarget = GetRandomPlayer()
+                    AddLog("Killed player: " .. currentTarget.Name)
+                end
+                
+                if TotalBounty >= 10000000 and not SeaBeastSummoned then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("SummonSeaBeast")
+                    SeaBeastSummoned = true
+                    AddLog("Summoned Sea Beast")
+                end
+                
+                if Kills >= 6 then
+                    TeleportService:Teleport(game.PlaceId, LocalPlayer)
+                    Kills = 0
+                    AddLog("Hopped server after 6 kills")
+                end
+            end
+        end)
+        wait(Platform == "Mobile" and 0.1 or 0.05)
+    end
+end)
+
+-- Đo FPS
+RunService.RenderStepped:Connect(function(delta)
+    CurrentFPS = 1/delta
+end)
+
+-- Xử lý nút Next Player
+NextPlayerButton.MouseButton1Click:Connect(function()
+    currentTarget = GetRandomPlayer()
+end)
+
+-- Cleanup
+local function Cleanup()
+    pcall(function()
+        for _, v in pairs(Workspace:GetDescendants()) do
+            if v:IsA("Decal") or v:IsA("Texture") or v:IsA("ParticleEmitter") then
+                v:Destroy()
+            end
+        end
+        collectgarbage("collect")
+        AddLog("Performed cleanup")
+    end)
+end
+spawn(function()
+    while _G.AutoBounty do
+        Cleanup()
+        wait(300)
+    end
+end)
+
+-- Error handling
+local function LogError(err)
+    AddLog("Error: " .. err)
+    warn("Error: " .. err)
+end
+
+-- Hiển thị log (tùy chọn)
+local LogFrame = Instance.new("ScrollingFrame", ControlPanel)
+LogFrame.Size = UDim2.new(0.8, 0, 0.2, 0)
+LogFrame.Position = UDim2.new(0.1, 0, 0.65, 0)
+LogFrame.BackgroundTransparency = 0.5
+LogFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+LogFrame.ScrollBarThickness = 5
+
+local LogText = Instance.new("TextLabel", LogFrame)
+LogText.Size = UDim2.new(1, 0, 0, 0)
+LogText.Position = UDim2.new(0, 0, 0, 0)
+LogText.BackgroundTransparency = 1
+LogText.TextColor3 = Color3.new(1, 1, 1)
+LogText.TextSize = 14
+LogText.TextWrapped = true
+LogText.Text = ""
+LogText.TextYAlignment = Enum.TextYAlignment.Top
+
+spawn(function()
+    while _G.AutoBounty do
+        pcall(function()
+            LogText.Text = table.concat(Logs, "\n")
+            LogFrame.CanvasSize = UDim2.new(0, 0, 0, LogText.TextBounds.Y)
+        end)
+        wait(1)
+    end
+end)
