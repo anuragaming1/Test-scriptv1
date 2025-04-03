@@ -1,0 +1,466 @@
+--[[
+  ANURA HUB AUTO BOUNTY PREMIUM v2.1
+  [FIXED ISSUES]
+  - Fixed nil reference to NextPlayerButton
+  - Removed problematic animation asset
+  - Improved error handling
+]]
+
+------------------- [CONFIGURATION] -------------------
+_G.Config = {
+    UseTeleportBypass = false,      -- true for TP bypass, false for normal flight
+    Team = "Pirates",               -- "Pirates" or "Marines"
+    FlySpeed = 120,                 -- Movement speed (normal flight mode)
+    AttackRange = 25,               -- Optimal attack distance
+    SkillCooldown = 0.15,           -- Delay between skills
+    AutoHopAfterKills = 6,          -- Kills before server hop
+    SummonSeaBeastAt = 10000000,    -- Bounty required to summon Sea Beast
+    FPSBoost = true,                -- Enable performance optimization
+    AntiBan = true,                 -- Enable advanced anti-ban systems
+    AutoBuffs = true,               -- Auto enable buffs
+    DebugMode = false               -- Show debug information
+}
+
+------------------- [SERVICES] -------------------
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local CoreGui = game:GetService("CoreGui")
+
+------------------- [VARIABLES] -------------------
+local LocalPlayer = Players.LocalPlayer
+local CurrentTarget = nil
+local BountyKills = 0
+local TotalBountyEarned = 0
+local KillsBeforeHop = 0
+local StartTime = tick()
+local CurrentFPS = 60
+local BuffsActive = false
+local SeaBeastSummoned = false
+local ScreenGui = nil
+local ControlPanel = nil
+local NextPlayerButton = nil
+
+------------------- [INITIALIZATION] -------------------
+-- Display script name and copyright
+print("\27[31mAnura Hub\27[0m - \27[32mAuto Bounty\27[0m")
+
+-- Create GUI
+local function CreateGUI()
+    ScreenGui = Instance.new("ScreenGui", CoreGui)
+    ScreenGui.Name = "AnuraHubAutoBounty"
+    ScreenGui.ResetOnSpawn = false
+    
+    -- Main control panel (simplified design without image)
+    ControlPanel = Instance.new("Frame", ScreenGui)
+    ControlPanel.Name = "ControlPanel"
+    ControlPanel.Size = UDim2.new(0, 500, 0, 600)
+    ControlPanel.Position = UDim2.new(0.5, -250, 0.5, -300)
+    ControlPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+    ControlPanel.BackgroundTransparency = 0.3
+    ControlPanel.Active = true
+    
+    -- Title labels
+    local TitleLabel = Instance.new("TextLabel", ControlPanel)
+    TitleLabel.Text = "ANURA HUB"
+    TitleLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+    TitleLabel.TextSize = 28
+    TitleLabel.Font = Enum.Font.SourceSansBold
+    TitleLabel.Position = UDim2.new(0.5, -80, 0.02, 0)
+    TitleLabel.BackgroundTransparency = 1
+    
+    local SubTitleLabel = Instance.new("TextLabel", ControlPanel)
+    SubTitleLabel.Text = "AUTO BOUNTY PREMIUM"
+    SubTitleLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+    SubTitleLabel.TextSize = 22
+    SubTitleLabel.Font = Enum.Font.SourceSansBold
+    SubTitleLabel.Position = UDim2.new(0.5, -120, 0.07, 0)
+    SubTitleLabel.BackgroundTransparency = 1
+    
+    -- Stats labels
+    local statY = 0.15
+    local stats = {
+        {"BountyKillsLabel", "Total Bounty Kills: 0"},
+        {"CurrentBountyLabel", "Current Bounty: 0"},
+        {"BountyEarnedLabel", "Bounty Earned: 0"},
+        {"TimeRunningLabel", "Time Running: 0s"},
+        {"FPSLabel", "FPS: 0"},
+        {"ServerHopLabel", "Next Hop After: 6 kills"},
+        {"TargetLabel", "Current Target: None"}
+    }
+    
+    for _, stat in pairs(stats) do
+        local label = Instance.new("TextLabel", ControlPanel)
+        label.Name = stat[1]
+        label.Text = stat[2]
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextSize = 18
+        label.Font = Enum.Font.SourceSans
+        label.Position = UDim2.new(0.1, 0, statY, 0)
+        label.Size = UDim2.new(0.8, 0, 0, 25)
+        label.BackgroundTransparency = 1
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        statY = statY + 0.05
+    end
+    
+    -- Next player button (fixed reference)
+    NextPlayerButton = Instance.new("TextButton", ControlPanel)
+    NextPlayerButton.Name = "NextPlayerButton"
+    NextPlayerButton.Text = "NEXT PLAYER"
+    NextPlayerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    NextPlayerButton.TextSize = 18
+    NextPlayerButton.Font = Enum.Font.SourceSansBold
+    NextPlayerButton.Position = UDim2.new(0.3, 0, 0.9, 0)
+    NextPlayerButton.Size = UDim2.new(0.4, 0, 0, 40)
+    NextPlayerButton.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+    
+    return ScreenGui
+end
+
+------------------- [OPTIMIZATION] -------------------
+local function OptimizeGame()
+    if not _G.Config.FPSBoost then return end
+    
+    -- Basic optimization
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 14
+    
+    -- Advanced optimization
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.Plastic
+            v.Reflectance = 0
+            v.CastShadow = false
+        elseif v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Sparkles") then
+            v.Enabled = false
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        end
+    end
+    
+    -- Fix black screen
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 14
+    
+    -- Clean up unnecessary objects
+    for _, v in pairs(Lighting:GetChildren()) do
+        if v:IsA("PostEffect") then
+            v.Enabled = false
+        end
+    end
+end
+
+------------------- [ANTI-BAN SYSTEM] -------------------
+local function SetupAntiBan()
+    if not _G.Config.AntiBan then return end
+    
+    -- Layer 1: Prevent kick/ban
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    setreadonly(mt, false)
+    
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" or method == "Ban" then
+            return nil
+        end
+        return oldNamecall(self, ...)
+    end)
+    
+    -- Layer 2: Simulate human behavior
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                -- Random movements
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("Humanoid") then
+                    char.Humanoid:MoveTo(char.HumanoidRootPart.Position + 
+                        Vector3.new(math.random(-5, 5), 0, math.random(-5, 5)))
+                end
+                
+                -- Random chat messages
+                if math.random(1, 20) == 1 then
+                    ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(
+                        "Farming bounty... "..math.random(1, 100), "All"
+                    )
+                end
+                
+                -- Random team switching
+                if math.random(1, 50) == 1 then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", 
+                        math.random(1, 2) == 1 and "Pirates" or "Marines")
+                end
+            end)
+            wait(math.random(10, 30))
+        end
+    end)
+    
+    -- Layer 3: Random pings
+    spawn(function()
+        while _G.AutoBounty do
+            pcall(function()
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("Ping")
+            end)
+            wait(math.random(60, 120))
+        end
+    end)
+end
+
+------------------- [TARGET SYSTEM] -------------------
+local function FindBestTarget()
+    local players = Players:GetPlayers()
+    local bestTarget = nil
+    local highestBounty = 0
+    
+    for _, player in pairs(players) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
+            local bounty = player:FindFirstChild("Data") and player.Data:FindFirstChild("Bounty") and player.Data.Bounty.Value or 0
+            if bounty > highestBounty and player.Character.Humanoid.Health > 0 then
+                bestTarget = player
+                highestBounty = bounty
+            end
+        end
+    end
+    
+    return bestTarget or (players[math.random(2, #players)] and players[math.random(2, #players)].Character and players[math.random(2, #players)] or nil)
+end
+
+------------------- [MOVEMENT SYSTEM] -------------------
+local function MoveToTarget(target)
+    if not target or not target.Character then return end
+    
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local targetHrp = target.Character:FindFirstChild("HumanoidRootPart")
+    if not targetHrp then return end
+    
+    local hrp = char.HumanoidRootPart
+    local distance = (targetHrp.Position - hrp.Position).Magnitude
+    
+    if _G.Config.UseTeleportBypass then
+        -- TP Bypass method
+        hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 5, 0)
+    else
+        -- Normal flight method
+        local direction = (targetHrp.Position - hrp.Position).Unit
+        hrp.Velocity = direction * _G.Config.FlySpeed
+        
+        -- Face target
+        hrp.CFrame = CFrame.new(hrp.Position, targetHrp.Position)
+    end
+end
+
+------------------- [BUFF SYSTEM] -------------------
+local function ActivateBuffs()
+    if not _G.Config.AutoBuffs or BuffsActive then return end
+    
+    pcall(function()
+        -- Activate Instinct
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("KenTalk", "Start")
+        
+        -- Activate Aura
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso")
+        
+        -- Activate Race V3
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("AwakeningChanger", "V3")
+        
+        -- Activate Race V4
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("AwakeningChanger", "V4")
+        
+        BuffsActive = true
+    end)
+end
+
+------------------- [SKILL SYSTEM] -------------------
+local function UseAllSkills()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("Humanoid") then return end
+    
+    -- Melee skills (Z, X, C)
+    for _, key in pairs({"Z", "X", "C"}) do
+        pcall(function()
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("Melee", key)
+            VirtualInputManager:SendKeyEvent(true, key, false, game)
+            wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, key, false, game)
+        end)
+        wait(_G.Config.SkillCooldown)
+    end
+    
+    -- Fruit skills (Z, X, C, V, F)
+    for _, key in pairs({"Z", "X", "C", "V", "F"}) do
+        pcall(function()
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("Fruit", key)
+            VirtualInputManager:SendKeyEvent(true, key, false, game)
+            wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, key, false, game)
+        end)
+        wait(_G.Config.SkillCooldown)
+    end
+    
+    -- Sword skills (Z, X)
+    for _, key in pairs({"Z", "X"}) do
+        pcall(function()
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("Sword", key)
+            VirtualInputManager:SendKeyEvent(true, key, false, game)
+            wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, key, false, game)
+        end)
+        wait(_G.Config.SkillCooldown)
+    end
+    
+    -- Gun skills (Z, X)
+    for _, key in pairs({"Z", "X"}) do
+        pcall(function()
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("Gun", key)
+            VirtualInputManager:SendKeyEvent(true, key, false, game)
+            wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, key, false, game)
+        end)
+        wait(_G.Config.SkillCooldown)
+    end
+    
+    -- Basic attacks
+    for i = 1, 10 do
+        VirtualUser:ClickButton1(Vector2.new(math.random(500, 600), math.random(300, 400))
+        wait(0.1)
+    end
+end
+
+------------------- [SEA BEAST SYSTEM] -------------------
+local function SummonSeaBeast()
+    if SeaBeastSummoned then return end
+    
+    local currentBounty = LocalPlayer.Data.Bounty.Value or 0
+    if currentBounty >= _G.Config.SummonSeaBeastAt then
+        pcall(function()
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("BuyHaki", "SeaBeast")
+            SeaBeastSummoned = true
+        end)
+    end
+end
+
+------------------- [SERVER HOP SYSTEM] -------------------
+local function HopServer()
+    pcall(function()
+        local servers = {}
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet(
+                "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"
+            ))
+        end)
+        
+        if success and result and result.data then
+            for _, server in pairs(result.data) do
+                if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                    table.insert(servers, server)
+                end
+            end
+            
+            if #servers > 0 then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)].id)
+            end
+        end
+    end)
+end
+
+------------------- [MAIN LOOP] -------------------
+local function FarmingLoop()
+    -- Initial setup
+    OptimizeGame()
+    SetupAntiBan()
+    ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", _G.Config.Team)
+    
+    -- Main farming loop
+    while _G.AutoBounty do
+        pcall(function()
+            -- Update UI
+            ControlPanel.BountyKillsLabel.Text = "Total Bounty Kills: "..BountyKills
+            ControlPanel.CurrentBountyLabel.Text = "Current Bounty: "..(LocalPlayer.Data.Bounty.Value or 0)
+            ControlPanel.BountyEarnedLabel.Text = "Bounty Earned: "..TotalBountyEarned
+            ControlPanel.TimeRunningLabel.Text = "Time Running: "..math.floor(tick() - StartTime).."s"
+            ControlPanel.FPSLabel.Text = "FPS: "..CurrentFPS
+            ControlPanel.ServerHopLabel.Text = "Next Hop After: "..(_G.Config.AutoHopAfterKills - KillsBeforeHop).." kills"
+            
+            -- Find target if none
+            if not CurrentTarget or not CurrentTarget.Character or CurrentTarget.Character.Humanoid.Health <= 0 then
+                CurrentTarget = FindBestTarget()
+                if CurrentTarget then
+                    ControlPanel.TargetLabel.Text = "Current Target: "..CurrentTarget.Name
+                else
+                    ControlPanel.TargetLabel.Text = "Current Target: None"
+                    wait(1)
+                    return
+                end
+            end
+            
+            -- Move to target
+            MoveToTarget(CurrentTarget)
+            
+            -- Check attack range
+            local distance = (CurrentTarget.Character.HumanoidRootPart.Position - 
+                            LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            
+            -- Attack if in range
+            if distance <= _G.Config.AttackRange then
+                UseAllSkills()
+            end
+            
+            -- Check for kill
+            if CurrentTarget.Character.Humanoid.Health <= 0 then
+                BountyKills = BountyKills + 1
+                local bountyEarned = CurrentTarget.Data.Bounty.Value or 10000
+                TotalBountyEarned = TotalBountyEarned + bountyEarned
+                KillsBeforeHop = KillsBeforeHop + 1
+                
+                -- Summon Sea Beast if eligible
+                SummonSeaBeast()
+                
+                -- Server hop if reached kill limit
+                if KillsBeforeHop >= _G.Config.AutoHopAfterKills then
+                    HopServer()
+                    KillsBeforeHop = 0
+                end
+                
+                -- Get new target
+                CurrentTarget = FindBestTarget()
+            end
+        end)
+        
+        wait(0.1)
+    end
+end
+
+------------------- [EVENT HANDLERS] -------------------
+-- Initialize GUI and buttons first
+CreateGUI()
+
+-- Next player button (now properly initialized)
+NextPlayerButton.MouseButton1Click:Connect(function()
+    CurrentTarget = FindBestTarget()
+    if CurrentTarget then
+        ControlPanel.TargetLabel.Text = "Current Target: "..CurrentTarget.Name
+    end
+end)
+
+-- FPS counter
+RunService.RenderStepped:Connect(function(delta)
+    CurrentFPS = math.floor(1/delta)
+end)
+
+-- Auto-execute (Kaitun mode)
+_G.AutoBounty = true
+spawn(FarmingLoop)
+
+print("ANURA HUB AUTO BOUNTY PREMIUM v2.1 LOADED | "..os.date("%X"))
