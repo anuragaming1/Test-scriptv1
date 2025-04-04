@@ -1,0 +1,210 @@
+-- Khởi tạo script
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+
+-- Config
+local Config = {
+    TpBypass = true, -- true: TP bypass, false: Bay thường
+    Team = "Pirates", -- "Pirates" hoặc "Marines"
+    UseSeaBeast = true,
+    AutoSwitchServer = true,
+}
+
+-- Biến trạng thái
+local AutoBounty = false
+local TotalBounty = 0
+local CurrentBounty = 0
+local KillCount = 0
+local StartTime = tick()
+local FPS = 0
+
+-- Hiển thị GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.Name = "AnuraHubGui"
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 250, 0, 150)
+Frame.Position = UDim2.new(0.5, -125, 0.5, -75)
+Frame.BackgroundTransparency = 0.2
+Frame.BackgroundColor3 = Color3.new(0, 0, 0)
+Frame.Parent = ScreenGui
+Frame.Image = "rbxassetid://136052983037396"
+
+local Title = Instance.new("TextLabel")
+Title.Text = "Anura Hub"
+Title.TextColor3 = Color3.new(1, 0, 0) -- Màu đỏ
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Position = UDim2.new(0, 0, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Parent = Frame
+
+local Status = Instance.new("TextLabel")
+Status.Text = "Auto Bounty: OFF"
+Status.TextColor3 = Color3.new(0, 1, 0) -- Màu xanh
+Status.Size = UDim2.new(1, 0, 0, 30)
+Status.Position = UDim2.new(0, 0, 0, 30)
+Status.BackgroundTransparency = 1
+Status.Parent = Frame
+
+local BountyInfo = Instance.new("TextLabel")
+BountyInfo.Text = "Total Bounty: 0 | Current: 0"
+BountyInfo.TextColor3 = Color3.new(1, 1, 1)
+BountyInfo.Size = UDim2.new(1, 0, 0, 30)
+BountyInfo.Position = UDim2.new(0, 0, 0, 60)
+BountyInfo.BackgroundTransparency = 1
+BountyInfo.Parent = Frame
+
+local FPSInfo = Instance.new("TextLabel")
+FPSInfo.Text = "FPS: 0 | Time: 0s"
+FPSInfo.TextColor3 = Color3.new(1, 1, 1)
+FPSInfo.Size = UDim2.new(1, 0, 0, 30)
+FPSInfo.Position = UDim2.new(0, 0, 0, 90)
+FPSInfo.BackgroundTransparency = 1
+FPSInfo.Parent = Frame
+
+-- Chức năng Auto Bounty
+local function UseSkill(skill)
+    VirtualUser:CaptureController()
+    VirtualUser:Button1Down(Vector2.new(0, 0))
+    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("UseSkill", skill)
+    wait(0.1)
+end
+
+local function AttackPlayer(target)
+    local Character = LocalPlayer.Character
+    local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+    local TargetRoot = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    
+    if not HumanoidRootPart or not TargetRoot then return end
+    
+    -- Di chuyển đến mục tiêu
+    if Config.TpBypass then
+        HumanoidRootPart.CFrame = TargetRoot.CFrame * CFrame.new(0, 5, 0)
+    else
+        -- Bay thường
+        local tween = game:GetService("TweenService"):Create(
+            HumanoidRootPart,
+            TweenInfo.new(1, Enum.EasingStyle.Linear),
+            {CFrame = TargetRoot.CFrame * CFrame.new(0, 5, 0)}
+        )
+        tween:Play()
+        tween.Completed:Wait()
+    end
+    
+    -- Sử dụng skill
+    for _, skill in pairs({"Z", "X", "C"}) do UseSkill(skill) end -- Melee
+    for _, skill in pairs({"Z", "X", "C", "V", "F"}) do UseSkill(skill) end -- Blox Fruit
+    for _, skill in pairs({"Z", "X"}) do UseSkill(skill) end -- Sword
+    for _, skill in pairs({"Z", "X"}) do UseSkill(skill) end -- Gun
+    
+    -- Đánh thường
+    for i = 1, 5 do
+        VirtualUser:ClickButton1(Vector2.new(0, 0))
+        wait(0.1)
+    end
+end
+
+local function GetRandomPlayer()
+    local players = Players:GetPlayers()
+    for _, player in pairs(players) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
+            return player
+        end
+    end
+    return nil
+end
+
+local function AutoBountyLoop()
+    AutoBounty = true
+    Status.Text = "Auto Bounty: ON"
+    
+    spawn(function()
+        while AutoBounty do
+            pcall(function()
+                local Character = LocalPlayer.Character
+                if not Character then return end
+                
+                -- Bật các buff
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("Ken", "Start") -- Instinct
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso") -- Aura
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("AwakenV3") -- Race V3
+                ReplicatedStorage.Remotes.CommF_:InvokeServer("AwakenV4") -- Race V4
+                
+                -- Tấn công player
+                local target = GetRandomPlayer()
+                if target then
+                    AttackPlayer(target)
+                    if target.Character and target.Character.Humanoid.Health <= 0 then
+                        KillCount = KillCount + 1
+                        TotalBounty = TotalBounty + 25000 -- Giả định mỗi kill 25k bounty
+                        CurrentBounty = LocalPlayer.Data.Bounty.Value
+                    end
+                end
+                
+                -- Summon Sea Beast khi đủ 10M bounty
+                if Config.UseSeaBeast and CurrentBounty >= 10000000 then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("SummonSeaBeast")
+                end
+                
+                -- Đổi server khi kill 6 người
+                if Config.AutoSwitchServer and KillCount >= 6 then
+                    TeleportService:Teleport(game.PlaceId, LocalPlayer, {Team = Config.Team})
+                end
+                
+                -- Cập nhật GUI
+                BountyInfo.Text = "Total Bounty: " .. TotalBounty .. " | Current: " .. CurrentBounty
+                FPSInfo.Text = "FPS: " .. math.floor(FPS) .. " | Time: " .. math.floor(tick() - StartTime) .. "s"
+                
+                -- FPS Boost
+                settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+                game.Lighting.GlobalShadows = false
+                game.Lighting.FogEnd = 9e9
+                
+            end)
+            wait(0.1)
+        end
+    end)
+end
+
+-- Nút Next Player
+local function NextPlayer()
+    local target = GetRandomPlayer()
+    if target then
+        AttackPlayer(target)
+    end
+end
+
+-- Anti Ban (Cơ bản)
+local function AntiBan()
+    spawn(function()
+        while AutoBounty do
+            pcall(function()
+                -- Random hóa hành động
+                VirtualUser:CaptureController()
+                wait(math.random(1, 5))
+                
+                -- Fake ping
+                ReplicatedStorage.Heartbeat:FireServer()
+                
+                -- Chống kick AFK
+                LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end)
+            wait(10)
+        end
+    end)
+end
+
+-- Khởi động script
+AutoBountyLoop()
+AntiBan()
+
+-- Đo FPS
+RunService.RenderStepped:Connect(function(delta)
+    FPS = 1 / delta
+end)
