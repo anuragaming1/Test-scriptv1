@@ -674,3 +674,29 @@ end
 
 print("Anura Hub - AntiBan + FPSBoost Loaded.")
 
+--===[ Anura Hub - No Clip Script ]===--
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local noclip = true -- Đổi thành false để tắt
+
+RunService.Stepped:Connect(function()
+    if noclip and Character and Character:FindFirstChild("HumanoidRootPart") then
+        for _, part in pairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide == true then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- Toggle bằng phím B (chỉ dùng được trên PC hoặc executor có hỗ trợ phím)
+local UIS = game:GetService("UserInputService")
+UIS.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.B then
+        noclip = not noclip
+    end
+end)
+
+print("[Anura Hub] No Clip đã bật! Nhấn B để bật/tắt (nếu dùng được)")
