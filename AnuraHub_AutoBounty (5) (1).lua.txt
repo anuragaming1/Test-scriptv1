@@ -1,0 +1,676 @@
+--[[
+    Anura Hub - Auto Bounty [Fluxus Android Optimized]
+    - Không cần menu, tự động chạy (Kaitun UI)
+    - Tối ưu cho Fluxus Android: hạn chế lag, chống clone nil, tránh bị kick
+    - FPS Boost, Auto Skill, Tween TP, Race V3/V4, Aura, Instinct, Sea Beast, v.v.
+]]
+
+-- Kiểm tra Executor
+local Executor = identifyexecutor and identifyexecutor() or "Unknown"
+if Executor ~= "Fluxus" then
+    warn("Script này chỉ tối ưu cho Fluxus Android.")
+end
+
+-- Chống kick + anti-banwave
+pcall(function()
+    if setfflag then
+        setfflag("AbuseReportScreenshotPercentage", "0")
+        setfflag("DFFlagAbuseReportScreenshot", "False")
+    end
+    if setreadonly then
+        setreadonly(getrawmetatable(game), false)
+    end
+end)
+
+-- FPS Boost
+for _,v in pairs(game:GetDescendants()) do
+    if v:IsA("BasePart") then
+        v.Material = Enum.Material.SmoothPlastic
+        v.Reflectance = 0
+    elseif v:IsA("Decal") then
+        v.Transparency = 1
+    end
+end
+
+-- Tắt hiệu ứng + khói
+game:GetService("Lighting").GlobalShadows = false
+game:GetService("Lighting").FogEnd = 100000
+settings().Rendering.QualityLevel = "Level01"
+collectgarbage("count")
+
+
+-- UI Bảng Điều Khiển
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = "AnuraHub_UI"
+
+local Frame = Instance.new("ImageLabel", ScreenGui)
+Frame.Size = UDim2.new(0, 300, 0, 200)
+Frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+Frame.BackgroundTransparency = 1
+Frame.Image = "rbxassetid://131151731604309"
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "Anura Hub"
+Title.TextColor3 = Color3.fromRGB(255, 0, 0)
+Title.TextStrokeTransparency = 0
+Title.TextSize = 20
+Title.BackgroundTransparency = 1
+
+local Sub = Instance.new("TextLabel", Frame)
+Sub.Position = UDim2.new(0, 0, 0, 30)
+Sub.Size = UDim2.new(1, 0, 0, 20)
+Sub.Text = "Auto Bounty"
+Sub.TextColor3 = Color3.fromRGB(0, 255, 0)
+Sub.TextSize = 16
+Sub.BackgroundTransparency = 1
+
+-- Thông tin Kill và Bounty
+local BountyLabel = Instance.new("TextLabel", Frame)
+BountyLabel.Position = UDim2.new(0, 10, 0, 60)
+BountyLabel.Size = UDim2.new(1, -20, 0, 20)
+BountyLabel.Text = "Bounty: 0"
+BountyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+BountyLabel.BackgroundTransparency = 1
+BountyLabel.TextScaled = true
+
+local KillLabel = Instance.new("TextLabel", Frame)
+KillLabel.Position = UDim2.new(0, 10, 0, 85)
+KillLabel.Size = UDim2.new(1, -20, 0, 20)
+KillLabel.Text = "Kills: 0"
+KillLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+KillLabel.BackgroundTransparency = 1
+KillLabel.TextScaled = true
+
+local FPSText = Instance.new("TextLabel", Frame)
+FPSText.Position = UDim2.new(0, 10, 0, 110)
+FPSText.Size = UDim2.new(1, -20, 0, 20)
+FPSText.Text = "FPS: 60"
+FPSText.TextColor3 = Color3.fromRGB(255, 255, 255)
+FPSText.BackgroundTransparency = 1
+FPSText.TextScaled = true
+
+-- Cập nhật FPS theo thời gian
+spawn(function()
+    while true do
+        local start = tick()
+        task.wait()
+        local fps = math.floor(1 / (tick() - start))
+        FPSText.Text = "FPS: " .. fps
+        task.wait(1)
+    end
+end)
+
+
+-- Auto bật Aura, Instinct, Race
+spawn(function()
+    while true do
+        pcall(function()
+            if not game.Players.LocalPlayer.Character:FindFirstChild("HasBuso") then
+                game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Buso")
+            end
+            if not game.Players.LocalPlayer.Character:FindFirstChild("Instinct") then
+                game:GetService("ReplicatedStorage").Remotes.CommE:InvokeServer("Ken", true)
+            end
+            if game:GetService("ReplicatedStorage").Remotes:FindFirstChild("ActivateRaceV4") then
+                game:GetService("ReplicatedStorage").Remotes.ActivateRaceV4:FireServer()
+            end
+        end)
+        task.wait(5)
+    end
+end)
+
+-- Tự động tìm player khác và Tween TP
+local function getRandomEnemy()
+    local players = {}
+    for _, plr in pairs(game.Players:GetPlayers()) do
+        if plr ~= game.Players.LocalPlayer and plr.Team ~= game.Players.LocalPlayer.Team then
+            table.insert(players, plr)
+        end
+    end
+    return #players > 0 and players[math.random(1, #players)] or nil
+end
+
+local TweenService = game:GetService("TweenService")
+
+local function tweenToTarget(target)
+    local char = game.Players.LocalPlayer.Character
+    if not char or not target or not target.Character then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+    if root and targetRoot then
+        local dist = (root.Position - targetRoot.Position).magnitude
+        local time = dist / 300
+        local tween = TweenService:Create(root, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0)})
+        tween:Play()
+        tween.Completed:Wait()
+    end
+end
+
+-- Tự động combo chiêu Z/X/C/V/F và đánh thường nếu hết chiêu
+local Config = {
+    AttackRange = 300, -- Phạm vi tấn công
+    ComboSpeed = 0.01, -- Tốc độ combo (giây)
+    WeaponSwitchDelay = 0.07, -- Thời gian đổi vũ khí
+    TargetRefreshRate = 1, -- Tần suất tìm mục tiêu mới (giây)
+    SupportSkillsInterval = 7, -- Kích hoạt skill hỗ trợ mỗi (giây)
+    AutoPvP = true -- Tự động bật PvP
+}
+
+-- DANH SÁCH COMBO TỐI ƯU
+local OptimalCombo = {
+    {Weapon = "Melee", Key = "C", Priority = 1},
+    {Weapon = "Melee", Key = "X", Priority = 2},
+    {Weapon = "Fruit", Key = "Z", Priority = 3},
+    {Weapon = "Fruit", Key = "X", Priority = 4},
+    {Weapon = "Melee", Key = "Z", Priority = 1},
+    {Weapon = "Sword", Key = "Z", Priority = 3},
+    {Weapon = "Gun", Key = "X", Priority = 2},
+    {Weapon = "Fruit", Key = "C", Priority = 4},
+    {Weapon = "Sword", Key = "X", Priority = 3},
+    {Weapon = "Gun", Key = "Z", Priority = 2},
+    {Weapon = "Fruit", Key = "V", Priority = 5},
+    {Weapon = "Fruit", Key = "F", Priority = 5}
+}
+
+-- HỆ THỐNG VŨ KHÍ
+local WeaponSystem = {
+    Melee = "One",
+    Sword = "Two",
+    Gun = "Three",
+    Fruit = "Four",
+    Current = "Melee"
+}
+
+-- BIẾN HỆ THỐNG
+local Target = nil
+local LastAttack = 0
+local SkillCooldowns = {}
+
+-- HÀM NÂNG CAO
+local function AdvancedPress(key)
+    if not key then return end
+    keypress(Enum.KeyCode[key])
+    task.wait(0.05)
+    keyrelease(Enum.KeyCode[key])
+end
+
+local function SwitchWeapon(weaponType)
+    if WeaponSystem.Current == weaponType then return end
+    local key = WeaponSystem[weaponType]
+    if key then
+        AdvancedPress(key)
+        WeaponSystem.Current = weaponType
+        task.wait(Config.WeaponSwitchDelay)
+    end
+end
+
+-- TỰ ĐỘNG TÌM MỤC TIÊU
+local function FindBestTarget()
+    local closest = nil
+    local minDistance = math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+            
+            if humanoid and humanoid.Health > 0 and rootPart then
+                local myRoot = Character:FindFirstChild("HumanoidRootPart")
+                if myRoot then
+                    local distance = (rootPart.Position - myRoot.Position).Magnitude
+                    if distance < Config.AttackRange and distance < minDistance then
+                        closest = player
+                        minDistance = distance
+                    end
+                end
+            end
+        end
+    end
+    
+    return closest
+end
+
+-- HỆ THỐNG COMBO TỰ ĐỘNG
+local function AutoCombo()
+    while task.wait() do
+        -- Làm mới mục tiêu
+        Target = FindBestTarget()
+        
+        if Target and Target.Character then
+            -- Sắp xếp combo theo độ ưu tiên
+            table.sort(OptimalCombo, function(a, b) return a.Priority > b.Priority end)
+            
+            -- Thực hiện combo
+            for _, attack in ipairs(OptimalCombo) do
+                SwitchWeapon(attack.Weapon)
+                AdvancedPress(attack.Key)
+                task.wait(Config.ComboSpeed)
+            end
+            
+            -- Về vũ khí mặc định
+            SwitchWeapon("Melee")
+        else
+            task.wait(Config.TargetRefreshRate)
+        end
+    end
+end
+
+-- TỰ ĐỘNG KĨ NĂNG HỖ TRỢ
+local function AutoSkills()
+    local skills = {"J", "E", "T", "Y"} -- Aura, Instinct, V3, V4
+    while task.wait(Config.SupportSkillsInterval) do
+        for _, skill in ipairs(skills) do
+            AdvancedPress(skill)
+            task.wait(0.1)
+        end
+    end
+end
+
+-- TỰ ĐỘNG PVP
+local function ManagePvP()
+    if Config.AutoPvP then
+        while task.wait(5) do
+            pcall(function()
+                local pvp = require(LocalPlayer.PlayerScripts.CombatFramework.PvP)
+                if pvp and not pvp.active then
+                    pvp:Toggle()
+                end
+            end)
+        end
+    end
+end
+
+-- KHỞI CHẠY HỆ THỐNG
+task.spawn(AutoCombo)
+task.spawn(AutoSkills)
+task.spawn(ManagePvP)
+
+print("🔄 Hệ thống Auto Combo hoàn toàn tự động đã sẵn sàng!")
+print("⚔️ Tự động tìm mục tiêu | 🔄 Tự động combo | 🛡️ Tự động kỹ năng")
+
+
+-- Auto chọn team theo config
+spawn(function()
+    while wait(1) do
+        if LocalPlayer.Team == nil or tostring(LocalPlayer.Team) ~= preferredTeam then
+            pcall(function()
+                if preferredTeam == "Pirates" then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
+                elseif preferredTeam == "Marines" then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Marines")
+                end
+            end)
+        end
+    end
+end)
+
+-- Theo dõi số kill và auto server hop sau 6 kill
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HRP = Character:WaitForChild("HumanoidRootPart")
+local Humanoid = Character:WaitForChild("Humanoid")
+
+-- Cấu hình
+local MAX_CHASE_TIME = 45 -- Giây
+local MAX_NO_DAMAGE_TIME = 30 -- Giây
+local SAFE_HEALTH_THRESHOLD = 0.1 -- 10% máu
+local RETURN_HEALTH_THRESHOLD = 0.3 -- 30% máu
+local EVADE_HEIGHT = 50 -- Độ cao khi né đòn
+
+-- Biến quản lý
+local currentTarget = nil
+local currentTween = nil
+local isChasing = false
+local isEvading = false
+local lastDamageTime = 0
+local chaseStartTime = 0
+local connection = nil
+local damageConnection = nil
+local humanoidConnection = nil
+
+-- Hàm hủy các kết nối
+local function cleanup()
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+    if damageConnection then
+        damageConnection:Disconnect()
+        damageConnection = nil
+    end
+    if humanoidConnection then
+        humanoidConnection:Disconnect()
+        humanoidConnection = nil
+    end
+    if currentTween then
+        currentTween:Cancel()
+        currentTween = nil
+    end
+end
+
+-- Kiểm tra vùng an toàn hoặc PvP (cần điều chỉnh theo game cụ thể)
+local function isInSafeZone(player)
+    -- Thêm logic kiểm tra vùng an toàn của game bạn ở đây
+    return false
+end
+
+-- Kiểm tra damage gần đây
+local function setupDamageTracking()
+    -- Giả sử game có RemoteEvent để track damage
+    -- Đây chỉ là ví dụ, cần điều chỉnh theo game cụ thể
+    local damageEvent = ReplicatedStorage:FindFirstChild("DamageEvent") or Instance.new("RemoteEvent")
+    damageConnection = damageEvent.OnClientEvent:Connect(function(hitPlayer, damage)
+        if hitPlayer == currentTarget then
+            lastDamageTime = os.time()
+        end
+    end)
+end
+
+-- Tìm người chơi hợp lệ để target
+local function getValidTarget()
+    local validPlayers = {}
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetHumanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+            
+            if targetHumanoid and targetHumanoid.Health > 0 and targetRoot and not isInSafeZone(player) then
+                table.insert(validPlayers, player)
+            end
+        end
+    end
+    
+    -- Sắp xếp theo khoảng cách gần nhất
+    table.sort(validPlayers, function(a, b)
+        return (HRP.Position - a.Character.HumanoidRootPart.Position).Magnitude < 
+               (HRP.Position - b.Character.HumanoidRootPart.Position).Magnitude
+    end)
+    
+    return validPlayers[1]
+end
+
+-- Di chuyển đến vị trí
+local function moveToPosition(position, speed)
+    if currentTween then
+        currentTween:Cancel()
+    end
+    
+    local distance = (HRP.Position - position).Magnitude
+    local duration = distance / speed
+    
+    currentTween = TweenService:Create(
+        HRP,
+        TweenInfo.new(duration, Enum.EasingStyle.Linear),
+        {CFrame = CFrame.new(position)}
+    )
+    currentTween:Play()
+    return currentTween
+end
+
+-- Bay lên cao để né đòn
+local function evade()
+    if isEvading then return end
+    
+    isEvading = true
+    local startPos = HRP.Position
+    local evadePos = startPos + Vector3.new(0, EVADE_HEIGHT, 0)
+    
+    moveToPosition(evadePos, 100) -- Tốc độ bay lên nhanh
+    
+    -- Kiểm tra máu để quay lại
+    local checkHealthConn
+    checkHealthConn = RunService.Heartbeat:Connect(function()
+        if Humanoid.Health / Humanoid.MaxHealth > RETURN_HEALTH_THRESHOLD then
+            checkHealthConn:Disconnect()
+            isEvading = false
+            if currentTarget and currentTarget.Character then
+                moveToPosition(currentTarget.Character.HumanoidRootPart.Position, 300)
+            end
+        end
+    end)
+end
+
+-- Đổi server
+local function changeServer()
+    -- Tìm server có nhiều người chơi hơn
+    local success, result = pcall(function()
+        return TeleportService:GetCurrentServerInstanceId()
+    end)
+    
+    if success then
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, result)
+    else
+        LocalPlayer:Kick("Đang chuyển server...")
+        task.wait(2)
+        game:GetService("TeleportService"):Teleport(game.PlaceId)
+    end
+end
+
+-- Bắt đầu đuổi mục tiêu
+local function chaseTarget(target)
+    if not target or not target.Character then return end
+    
+    cleanup()
+    currentTarget = target
+    chaseStartTime = os.time()
+    lastDamageTime = os.time()
+    
+    -- Thiết lập tracking damage
+    setupDamageTracking()
+    
+    -- Theo dõi máu của bản thân
+    humanoidConnection = Humanoid.HealthChanged:Connect(function()
+        local healthRatio = Humanoid.Health / Humanoid.MaxHealth
+        
+        if healthRatio < SAFE_HEALTH_THRESHOLD and not isEvading then
+            evade()
+        end
+    end)
+    
+    -- Vòng lặp đuổi bám chính
+    connection = RunService.Heartbeat:Connect(function()
+        -- Kiểm tra điều kiện dừng
+        if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
+            cleanup()
+            return
+        end
+        
+        local targetHumanoid = target.Character:FindFirstChildOfClass("Humanoid")
+        if not targetHumanoid or targetHumanoid.Health <= 0 then
+            cleanup()
+            return
+        end
+        
+        -- Kiểm tra thời gian
+        local currentTime = os.time()
+        if currentTime - lastDamageTime > MAX_NO_DAMAGE_TIME then
+            cleanup()
+            return
+        end
+        
+        if currentTime - chaseStartTime > MAX_CHASE_TIME then
+            cleanup()
+            return
+        end
+        
+        -- Kiểm tra vùng an toàn
+        if isInSafeZone(target) then
+            cleanup()
+            return
+        end
+        
+        -- Di chuyển đến mục tiêu
+        local targetPos = target.Character.HumanoidRootPart.Position
+        if isEvading then
+            targetPos = targetPos + Vector3.new(0, EVADE_HEIGHT, 0)
+        end
+        
+        moveToPosition(targetPos, 300) -- Tốc độ di chuyển cao
+    end)
+end
+
+-- Hàm chính
+local function mainLoop()
+    while true do
+        -- Kiểm tra nếu kill hết người chơi
+        if #Players:GetPlayers() <= 1 then
+            changeServer()
+            break
+        end
+        
+        -- Tìm mục tiêu mới
+        local target = getValidTarget()
+        
+        if target then
+            chaseTarget(target)
+            
+            -- Chờ cho đến khi kết thúc chase (do điều kiện nào đó)
+            while connection do
+                task.wait(1)
+            end
+            
+            -- Nếu bị kill, đổi server
+            if Humanoid.Health <= 0 then
+                task.wait(3) -- Chờ respawn
+                changeServer()
+                break
+            end
+        else
+            task.wait(1)
+        end
+    end
+end
+
+-- Xử lý khi respawn
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    Character = newChar
+    HRP = newChar:WaitForChild("HumanoidRootPart")
+    Humanoid = newChar:WaitForChild("Humanoid")
+    
+    -- Bắt đầu lại nếu bị kill
+    if isChasing then
+        task.wait(1) -- Chờ 1s sau khi respawn
+        mainLoop()
+    end
+end)
+
+-- Bắt đầu chương trình
+mainLoop()
+
+-- Summon Sea Beast khi đủ 10m bounty
+spawn(function()
+    while true do
+        local bounty = game.Players.LocalPlayer.leaderstats and game.Players.LocalPlayer.leaderstats.Bounty
+        if bounty and bounty.Value >= 10000000 then
+            game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("SeaBeast")
+        end
+        task.wait(30)
+    end
+end)
+
+-- Next Player button
+local nextBtn = Instance.new("TextButton", Frame)
+nextBtn.Position = UDim2.new(0.5, -60, 1, -40)
+nextBtn.Size = UDim2.new(0, 120, 0, 25)
+nextBtn.Text = "Next Player"
+nextBtn.TextScaled = true
+nextBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+nextBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+local skipTarget = false
+nextBtn.MouseButton1Click:Connect(function()
+    skipTarget = true
+end)
+
+-- Đo thời gian chạy script
+local startTime = os.time()
+spawn(function()
+    while true do
+        local used = os.time() - startTime
+        local min = math.floor(used / 60)
+        local sec = used % 60
+        Title.Text = "Anura Hub ("..min.."m "..sec.."s)"
+        task.wait(1)
+    end
+end)
+
+-- Kết hợp skipTarget trong loop kill
+spawn(function()
+    while true do
+        local target = getRandomEnemy()
+        if target then
+            tweenToTarget(target)
+            attackTarget(target)
+            hopKillCount = hopKillCount + 1
+            KillLabel.Text = "Kills: "..hopKillCount
+            if hopKillCount >= 6 then
+                hopServer()
+            end
+        end
+        if skipTarget then
+            skipTarget = false
+        end
+        task.wait(3)
+    end
+end)
+
+
+-- FPS Boost + Fix Lag + Tối ưu Treo Máy
+settings().Rendering.QualityLevel = "Level01"
+game:GetService("Lighting").GlobalShadows = false
+game:GetService("Lighting").FogEnd = 9e9
+game:GetService("Lighting").Brightness = 0
+for _, v in pairs(game:GetDescendants()) do
+    if v:IsA("BasePart") and not v:IsA("MeshPart") then
+        v.Material = Enum.Material.Plastic
+        v.Reflectance = 0
+    elseif v:IsA("Decal") or v:IsA("Texture") then
+        v:Destroy()
+    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+        v.Lifetime = NumberRange.new(0)
+    end
+end
+game:GetService("StarterGui"):SetCore("ResetButtonCallback", false)
+game:GetService("RunService"):Set3dRenderingEnabled(false)
+
+-- Anti Kick, giữ kết nối
+local VirtualUser = game:service('VirtualUser')
+game:service('Players').LocalPlayer.Idled:connect(function()
+    VirtualUser:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+end)
+
+-- Anti BanWave Update 26
+local function protectRemotes()
+    local Blocked = {"Ban", "Kick", "Shutdown", "SetBan", "SetKick"}
+    for _, conn in pairs(getgc(true)) do
+        if type(conn) == "function" and getfenv(conn).script then
+            local name = getfenv(conn).script.Name
+            for _, word in ipairs(Blocked) do
+                if string.find(name:lower(), word:lower()) then
+                    hookfunction(conn, function(...) return nil end)
+                end
+            end
+        end
+    end
+end
+pcall(protectRemotes)
+
+-- Tắt các core scripts không cần thiết
+for _, v in pairs(game:GetService("StarterGui"):GetChildren()) do
+    if v:IsA("Script") or v:IsA("LocalScript") then
+        v.Disabled = true
+    end
+end
+
+print("Anura Hub - AntiBan + FPSBoost Loaded.")
+
