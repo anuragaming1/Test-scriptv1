@@ -1,0 +1,450 @@
+-- Anura: Void Collapse Destroyer (Cảnh báo: Script phá map mạnh, nguy cơ ban cao)
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Root = Character:WaitForChild("HumanoidRootPart")
+
+-- Tạo quả cầu blackhole
+local blackhole = Instance.new("Part", Workspace)
+blackhole.Shape = Enum.PartType.Ball
+blackhole.Anchored = true
+blackhole.CanCollide = false
+blackhole.Size = Vector3.new(120, 120, 120)
+blackhole.Material = Enum.Material.Neon
+blackhole.Color = Color3.fromRGB(0, 0, 0)
+blackhole.Position = Root.Position + Vector3.new(0, 150, 0)
+blackhole.Transparency = 0.2
+blackhole.Name = "VOID_COLLAPSE"
+
+-- Hiệu ứng particle
+local p = Instance.new("ParticleEmitter", blackhole)
+p.Texture = "rbxassetid://243660364"
+p.Rate = 999
+p.Lifetime = NumberRange.new(2)
+p.Size = NumberSequence.new(10)
+p.Speed = NumberRange.new(50)
+p.Rotation = NumberRange.new(0, 360)
+p.LightEmission = 1
+
+-- Âm thanh đen tối
+local s = Instance.new("Sound", blackhole)
+s.SoundId = "rbxassetid://9121411270"
+s.Volume = 10
+s.Looped = true
+s:Play()
+
+-- Xoá bản đồ client-side
+for _, obj in pairs(Workspace:GetDescendants()) do
+    if obj:IsA("BasePart") and obj:IsDescendantOf(Workspace) and obj.Name ~= "HumanoidRootPart" then
+        if (obj.Position - Root.Position).Magnitude < 600 then
+            obj.Anchored = false
+            obj.CanCollide = false
+            TweenService:Create(obj, TweenInfo.new(2), {
+                Position = blackhole.Position + Vector3.new(math.random(-10,10), -50, math.random(-10,10)),
+                Transparency = 1
+            }):Play()
+            Debris:AddItem(obj, 4)
+        end
+    end
+end
+
+-- Làm tối bầu trời
+Lighting.FogEnd = 100
+Lighting.Brightness = 0
+Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+
+-- Hút toàn bộ player + NPC
+local function suck(target)
+    local hrp = target:FindFirstChild("HumanoidRootPart")
+    local hum = target:FindFirstChild("Humanoid")
+    if hrp and hum and hum.Health > 0 then
+        TweenService:Create(hrp, TweenInfo.new(0.4), {
+            CFrame = CFrame.new(blackhole.Position + Vector3.new(0, -20, 0))
+        }):Play()
+        -- Nếu không chết, cho rơi void
+        task.delay(2, function()
+            if hum.Health > 0 then
+                hrp.Position = Vector3.new(hrp.Position.X, -9999, hrp.Position.Z)
+            end
+        end)
+    end
+end
+
+-- Spam hút player
+RunService.Heartbeat:Connect(function()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            suck(plr.Character)
+        end
+    end
+end)
+
+-- Hút NPC, Object
+RunService.Heartbeat:Connect(function()
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
+            suck(obj)
+        end
+    end
+end)
+
+-- Tự hủy sau 30 giây
+task.delay(30, function()
+    blackhole:Destroy()
+    Lighting.FogEnd = 100000
+    Lighting.Brightness = 2
+end)
+-- Anura: Void Collapse Destroyer - Part2.lua
+-- Tự động bật PvP, Aura, Instinct và spam combo kỹ năng để giết player
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local LocalPlayer = Players.LocalPlayer
+
+function pressKey(key)
+    VirtualInputManager:SendKeyEvent(true, key, false, game)
+    task.wait(0.1)
+    VirtualInputManager:SendKeyEvent(false, key, false, game)
+end
+
+-- Bật PvP nếu bị tắt
+task.spawn(function()
+    while task.wait(3) do
+        pcall(function()
+            if LocalPlayer.PlayerGui:FindFirstChild("Main") and LocalPlayer.PlayerGui.Main.PvpDisabled.Visible == true then
+                fireclickdetector(Workspace:FindFirstChild("Friendly"):FindFirstChild("ClickDetector"))
+            end
+        end)
+    end
+end)
+
+-- Bật Aura, Instinct liên tục
+task.spawn(function()
+    while true do
+        pressKey("H") -- Aura
+        pressKey("T") -- Instinct
+        task.wait(1)
+    end
+end)
+
+-- Auto Combo khi hút player
+task.spawn(function()
+    local function getTarget()
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = plr.Character.HumanoidRootPart
+                if (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude < 80 then
+                    return plr
+                end
+            end
+        end
+        return nil
+    end
+
+    local weapons = {"Melee", "Sword", "Gun", "Fruit"}
+    local skills = {"Z", "X", "C", "V", "F"}
+
+    while true do
+        local target = getTarget()
+        if target then
+            for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    tool.Parent = LocalPlayer.Character
+                    task.wait(0.1)
+                    for _, key in ipairs(skills) do
+                        pressKey(key)
+                        task.wait(0.2)
+                    end
+                end
+            end
+            -- Đánh thường nếu còn gần
+            pressKey("Mouse1")
+        end
+        task.wait(0.5)
+    end
+end)
+-- Anura: Void Collapse Destroyer - Part3.lua
+-- Giao diện HUD hiển thị Kill, Target, FPS, Thời gian dùng
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Tạo ScreenGui
+local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+gui.Name = "VoidCollapseGUI"
+gui.ResetOnSpawn = false
+
+-- Khung chính
+local frame = Instance.new("Frame", gui)
+frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+frame.BorderSizePixel = 0
+frame.Position = UDim2.new(0.7, 0, 0.05, 0)
+frame.Size = UDim2.new(0, 260, 0, 140)
+frame.BackgroundTransparency = 0.2
+
+-- Title
+local title = Instance.new("TextLabel", frame)
+title.Text = "VOID COLLAPSE"
+title.Font = Enum.Font.GothamBlack
+title.TextColor3 = Color3.fromRGB(255, 50, 50)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.TextScaled = true
+
+-- Các dòng info
+local killCount = 0
+local startTime = tick()
+local infoLabels = {}
+
+local infoNames = {
+    "Kills: ",
+    "Target: ",
+    "Players: ",
+    "FPS: ",
+    "Uptime: "
+}
+
+for i, name in ipairs(infoNames) do
+    local label = Instance.new("TextLabel", frame)
+    label.Text = name .. "0"
+    label.Font = Enum.Font.Code
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextSize = 16
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.BackgroundTransparency = 1
+    label.Position = UDim2.new(0, 10, 0, 30 + (i-1)*20)
+    label.Size = UDim2.new(1, -20, 0, 20)
+    table.insert(infoLabels, label)
+end
+
+-- Cập nhật info mỗi frame
+RunService.RenderStepped:Connect(function()
+    local target = "None"
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            if (plr.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude < 80 then
+                target = plr.Name
+            end
+        end
+    end
+
+    local fps = math.floor(1 / RunService.RenderStepped:Wait())
+    local uptime = math.floor(tick() - startTime)
+    local minutes = math.floor(uptime / 60)
+    local seconds = uptime % 60
+
+    infoLabels[1].Text = "Kills: " .. tostring(killCount)
+    infoLabels[2].Text = "Target: " .. target
+    infoLabels[3].Text = "Players: " .. #Players:GetPlayers()
+    infoLabels[4].Text = "FPS: " .. fps
+    infoLabels[5].Text = "Uptime: " .. minutes .. "m " .. seconds .. "s"
+end)
+
+-- Tăng kill khi có người chết gần
+game:GetService("Workspace").ChildRemoved:Connect(function(obj)
+    if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+        local hum = obj:FindFirstChild("Humanoid")
+        if hum and hum.Health <= 0 then
+            killCount += 1
+        end
+    end
+end)
+-- Anura: Void Collapse Destroyer - Part4.lua
+-- Summon Sea Beast + Server Hop + Anti Kick
+
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Auto Summon Sea Beast nếu bounty >= 10M
+task.spawn(function()
+    while task.wait(10) do
+        pcall(function()
+            local bountyText = LocalPlayer.PlayerGui.Main:FindFirstChild("Bounty")
+            if bountyText then
+                local bountyValue = tonumber(bountyText.Text:match("%d+"))
+                if bountyValue and bountyValue >= 10000000 then
+                    local args = {
+                        [1] = "SummonSeaBeast"
+                    }
+                    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer(unpack(args))
+                    print("[Void Collapse] Summoning Sea Beast!")
+                end
+            end
+        end)
+    end
+end)
+
+-- Server Hop nếu không còn player hợp lệ
+task.spawn(function()
+    while wait(15) do
+        local valid = false
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") then
+                if plr.Team ~= LocalPlayer.Team and plr.Character.Humanoid.Health > 0 then
+                    valid = true
+                end
+            end
+        end
+        if not valid then
+            print("[Void Collapse] No valid target, server hopping...")
+            local PlaceID = game.PlaceId
+            local JobID = ""
+            local success, servers = pcall(function()
+                return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100"))
+            end)
+            if success and servers and servers.data then
+                for _, server in pairs(servers.data) do
+                    if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                        JobID = server.id
+                        break
+                    end
+                end
+                if JobID ~= "" then
+                    TeleportService:TeleportToPlaceInstance(PlaceID, JobID)
+                end
+            end
+        end
+    end
+end)
+
+-- Anti Kick/Anti Error nhẹ
+task.spawn(function()
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end)
+
+    game:GetService("ScriptContext").Error:Connect(function(err, trace)
+        warn("[VOID COLLAPSE] CATCHED ERROR >> ", err)
+    end)
+end)
+-- Anura: Void Collapse Destroyer - Part5.lua
+-- Tạo hiệu ứng quả cầu đen hút cực mạnh trên trời
+
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- Tạo quả cầu đen cực lớn trên trời
+local blackhole = Instance.new("Part", Workspace)
+blackhole.Name = "VoidCollapseCore"
+blackhole.Shape = Enum.PartType.Ball
+blackhole.Size = Vector3.new(120,120,120)
+blackhole.Anchored = true
+blackhole.CanCollide = false
+blackhole.Position = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(0,180,0)
+blackhole.Material = Enum.Material.Neon
+blackhole.Color = Color3.fromRGB(5,5,5)
+blackhole.Transparency = 0.1
+
+-- Tạo vòng xoáy xung quanh
+for i = 1, 6 do
+    local ring = Instance.new("Part", blackhole)
+    ring.Anchored = true
+    ring.CanCollide = false
+    ring.Size = Vector3.new(140, 1, 140)
+    ring.Material = Enum.Material.Neon
+    ring.Color = Color3.fromRGB(60, 0, 60)
+    ring.Transparency = 0.3
+    ring.CFrame = blackhole.CFrame * CFrame.Angles(0, math.rad(i * 60), 0)
+end
+
+-- Vòng quay blackhole
+RunService.Heartbeat:Connect(function()
+    blackhole.CFrame = blackhole.CFrame * CFrame.Angles(0, math.rad(2), 0)
+end)
+
+-- Hút tất cả mọi thứ trong phạm vi
+task.spawn(function()
+    while task.wait(0.1) do
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Position - blackhole.Position).Magnitude < 300 then
+                if not obj.Anchored and not obj:IsDescendantOf(LocalPlayer.Character) then
+                    local dir = (blackhole.Position - obj.Position).Unit
+                    obj.Velocity = dir * 160 + Vector3.new(0,30,0)
+                end
+            end
+        end
+    end
+end)
+
+-- Gây damage khi gần blackhole
+task.spawn(function()
+    while task.wait(0.3) do
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local root = plr.Character:FindFirstChild("HumanoidRootPart")
+                local hum = plr.Character:FindFirstChild("Humanoid")
+                if (root.Position - blackhole.Position).Magnitude < 30 then
+                    hum:TakeDamage(99)
+                end
+            end
+        end
+    end
+end)
+-- Anura: Void Collapse Destroyer - Part6.lua
+-- Blackhole phát nổ – Gây sát thương toàn server – Phá hủy visual map
+
+local debris = game:GetService("Debris")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+
+local blackhole = Workspace:FindFirstChild("VoidCollapseCore")
+if not blackhole then return end
+
+-- Đợi 15 giây rồi phát nổ
+task.delay(15, function()
+    print("[VOID COLLAPSE] BLACKHOLE DETONATING...")
+
+    -- Hiệu ứng chớp sáng siêu tân tinh
+    local flash = Instance.new("PointLight", blackhole)
+    flash.Color = Color3.fromRGB(255, 0, 255)
+    flash.Range = 200
+    flash.Brightness = 100
+    debris:AddItem(flash, 1)
+
+    -- Hiệu ứng nổ
+    local explosion = Instance.new("Explosion", Workspace)
+    explosion.Position = blackhole.Position
+    explosion.BlastPressure = 0
+    explosion.BlastRadius = 200
+    explosion.DestroyJointRadiusPercent = 0
+
+    -- Sóng xung kích phá part gần đó (client)
+    for _, part in pairs(Workspace:GetDescendants()) do
+        if part:IsA("BasePart") and (part.Position - blackhole.Position).Magnitude < 300 then
+            if not part:IsDescendantOf(LocalPlayer.Character) and not part:IsA("Terrain") then
+                pcall(function()
+                    part.Anchored = false
+                    part.Velocity = Vector3.new(math.random(-200,200), 300, math.random(-200,200))
+                    debris:AddItem(part, 5)
+                end)
+            end
+        end
+    end
+
+    -- Gây sát thương toàn server
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") then
+            plr.Character.Humanoid:TakeDamage(math.random(80,150))
+        end
+    end
+
+    -- Xóa blackhole sau nổ
+    blackhole:Destroy()
+end)
