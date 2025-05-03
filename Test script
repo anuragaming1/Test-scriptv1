@@ -1,0 +1,612 @@
+-- Blox Fruits Ultimate Auto Fly and Kill Script - Part 1: Config and Utility Functions
+-- Author: Grok 3 (xAI)
+-- Date: May 02, 2025
+-- Description: Khởi tạo, cấu hình, giao diện trạng thái, kiểm tra nhân vật, Safe Zone, PVP, Ally Team, khu vực bỏ qua
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+
+-- Cài đặt cấu hình
+local Config = {
+    FlySpeed = 320, -- Tốc độ bay
+    AttackRange = 10, -- Phạm vi tấn công
+    LowHealthThreshold = 0.1, -- Ngưỡng máu thấp (10%)
+    RecoveryHealthThreshold = 0.3, -- Ngưỡng hồi máu (30%)
+    NoDamageTimeout = 30, -- Thời gian không gây sát thương (giây)
+    NoKillTimeout = 45, -- Thời gian không giết được (giây)
+    HighFlyHeight = 350, -- Độ cao bay lên khi máu thấp
+    DefaultFlyHeight = 70, -- Độ cao mặc định khi bay
+    KillCountToHop = 5, -- Số kill để đổi server
+    DebugMode = true, -- Bật/tắt ghi log
+    MaxServerHopAttempts = 3, -- Số lần thử đổi server
+    HealItemName = "HealthPotion", -- Tên vật phẩm hồi máu (kiểm tra thực tế)
+    AttackMethod = "Remote", -- "Remote", "Tool", hoặc "Skill"
+    AttackRemoteName = "Damage", -- Tên remote event tấn công (kiểm tra thực tế)
+    AttackToolName = "Sword", -- Tên công cụ tấn công (kiểm tra thực tế)
+    AttackSkillName = "FruitSkill", -- Tên skill/quả ác quỷ (kiểm tra thực tế)
+    WaterLevel = 0, -- Độ cao mặt nước (tự động phát hiện nếu = 0)
+    AntiAFKInterval = 60, -- Thời gian chống AFK (giây)
+    StatusUIEnabled = true, -- Bật/tắt giao diện trạng thái
+    NoTargetTimeout = 10, -- Thời gian không tìm thấy mục tiêu thì đổi server (giây)
+    IgnoredAreas = {
+        -- Sea 3 (cần cập nhật tọa độ thực tế)
+        {Name = "Mansion", Position = Vector3.new(-390, 330, -1240), Radius = 500},
+        {Name = "Castle on the Sea", Position = Vector3.new(-5000, 315, -2800), Radius = 1000},
+        {Name = "Tiki Outpost", Position = Vector3.new(-1600, 10, -5500), Radius = 600},
+        -- Sea 2
+        {Name = "Hot and Cold", Position = Vector3.new(-6000, 15, 2000), Radius = 800},
+        {Name = "Cafe", Position = Vector3.new(-380, 75, 250), Radius = 400}
+    }
+}
+
+-- Biến trạng thái
+local Target = nil
+local LastDamageTime = tick()
+local TargetStartTime = tick()
+local LastAntiAFKTime = tick()
+local LastNoTargetTime = tick()
+local IsFlyingHigh = false
+local IsScriptRunning = true
+local IsAttacking = true
+local LastHealth = 0
+local AttackCount = 0
+local KillCount = 0
+local ServerHopAttempts = 0
+local StatusLabel = nil
+local WaterLevelDetected = false
+
+-- Hàm ghi log
+local function Log(message)
+    if Config.DebugMode then
+        print("[BloxFruitsScript] " .. message)
+    end
+end
+
+-- Hàm cập nhật giao diện trạng thái
+local function UpdateStatusUI(message)
+    if Config.StatusUIEnabled then
+        if not StatusLabel then
+            local ScreenGui = Instance.new("ScreenGui")
+            ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+            StatusLabel = Instance.new("TextLabel")
+            StatusLabel.Size = UDim2.new(0.4, 0, 0.1, 0)
+            StatusLabel.Position = UDim2.new(0.3, 0, 0, 0)
+            StatusLabel.BackgroundTransparency = 0.5
+            StatusLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+            StatusLabel.TextColor3 = Color3.new(1, 1, 1)
+            StatusLabel.TextScaled = true
+            StatusLabel.Parent = ScreenGui
+        end
+        StatusLabel.Text = "[Blox Fruits] " .. message
+    end
+end
+
+-- Hàm kiểm tra nhân vật hợp lệ
+local function IsCharacterValid(player)
+    if not player or not player.Character then
+        Log("Character invalid: No player or character")
+        return false
+    end
+    local humanoid = player.Character:FindFirstChild("Humanoid")
+    local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+    if not (humanoid and rootPart and humanoid.Health > 0) then
+        Log("Character invalid: Missing humanoid/rootPart or dead")
+        return false
+    end
+    return true
+end
+
+-- Hàm kiểm tra PVP
+local function IsPVPEnabled(player)
+    if not IsCharacterValid(player) then return false end
+    local hasPVP = true -- Giả định PVP luôn bật, cần kiểm tra thực tế
+    Log("Checking PVP for " .. player.Name .. ": " .. tostring(hasPVP))
+    return hasPVP
+end
+
+-- Hàm kiểm tra vùng an toàn
+local function IsInSafeZone(player)
+    if not IsCharacterValid(player) then
+        Log("SafeZone check failed: Invalid character")
+        return true
+    end
+    local inSafeZone = player.Character:FindFirstChild("SafeZone") ~= nil
+    Log("Checking SafeZone for " .. player.Name .. ": " .. tostring(inSafeZone))
+    return inSafeZone
+end
+
+-- Hàm kiểm tra Ally Team
+local function IsAllyTeam(player)
+    if not IsCharacterValid(player) then
+        Log("AllyTeam check failed: Invalid character")
+        return false
+    end
+    local isAlly = LocalPlayer:IsFriendsWith(player.UserId)
+    Log("Checking Ally Team for " .. player.Name .. ": " .. tostring(isAlly))
+    return isAlly
+end
+
+-- Hàm kiểm tra khu vực bị bỏ qua
+local function IsInIgnoredArea(position)
+    for _, area in pairs(Config.IgnoredAreas) do
+        local distance = (position - area.Position).Magnitude
+        if distance <= area.Radius then
+            Log("Position in ignored area: " .. area.Name)
+            return true
+        end
+    end
+    return false
+end
+-- Blox Fruits Ultimate Auto Fly and Kill Script - Part 2: Flying and Movement
+-- Description: Bay cao, né đòn, chống AFK, kiểm tra địa hình, điều chỉnh độ cao, phát hiện nước
+
+-- Hàm tự động phát hiện độ cao mặt nước
+local function DetectWaterLevel()
+    if Config.WaterLevel == 0 and not WaterLevelDetected then
+        if IsCharacterValid(LocalPlayer) then
+            local rootPart = LocalPlayer.Character.HumanoidRootPart
+            local rayOrigin = rootPart.Position + Vector3.new(0, 100, 0)
+            local rayDirection = Vector3.new(0, -200, 0)
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+            local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+            if raycastResult then
+                Config.WaterLevel = raycastResult.Position.Y
+                WaterLevelDetected = true
+                Log("Detected water level: " .. Config.WaterLevel)
+                UpdateStatusUI("Detected water level: " .. Config.WaterLevel)
+            end
+        end
+    end
+    return Config.WaterLevel
+end
+
+-- Hàm kiểm tra địa hình và điều chỉnh độ cao
+local function CheckTerrainHeight(position)
+    local rayOrigin = position + Vector3.new(0, 200, 0)
+    local rayDirection = Vector3.new(0, -400, 0)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    if raycastResult then
+        local terrainHeight = raycastResult.Position.Y
+        Log("Terrain height detected: " .. terrainHeight)
+        return math.max(position.Y, terrainHeight + Config.DefaultFlyHeight)
+    end
+    return position.Y
+end
+
+-- Hàm điều chỉnh độ cao bay
+local function AdjustFlyHeight(targetPos)
+    local waterLevel = DetectWaterLevel()
+    local terrainHeight = CheckTerrainHeight(targetPos)
+    local minHeight = math.max(waterLevel + Config.DefaultFlyHeight, terrainHeight)
+    if targetPos.Y < minHeight then
+        targetPos = Vector3.new(targetPos.X, minHeight, targetPos.Z)
+        Log("Adjusted fly height to avoid water/terrain: " .. tostring(targetPos))
+    end
+    return targetPos
+end
+
+-- Hàm kiểm tra độ cao hiện tại
+local function CheckCurrentHeight()
+    if IsCharacterValid(LocalPlayer) then
+        local rootPart = LocalPlayer.Character.HumanoidRootPart
+        local currentHeight = rootPart.Position.Y
+        local waterLevel = DetectWaterLevel()
+        if currentHeight < waterLevel + Config.DefaultFlyHeight then
+            local safePos = Vector3.new(rootPart.Position.X, waterLevel + Config.DefaultFlyHeight, rootPart.Position.Z)
+            TweenToPosition(safePos)
+            Log("Adjusted current height to avoid water: " .. tostring(safePos))
+            UpdateStatusUI("Adjusted height to avoid water")
+        end
+    end
+end
+
+-- Hàm bay đến vị trí
+local function TweenToPosition(targetPos)
+    if not IsCharacterValid(LocalPlayer) then
+        Log("Invalid local character, cannot tween")
+        return
+    end
+
+    targetPos = AdjustFlyHeight(targetPos)
+    local rootPart = LocalPlayer.Character.HumanoidRootPart
+    local distance = (rootPart.Position - targetPos).Magnitude
+    local tweenInfo = TweenInfo.new(distance / Config.FlySpeed, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+    local tween = TweenService:Create(rootPart, tweenInfo, {CFrame = CFrame.new(targetPos)})
+    
+    tween:Play()
+    Log("Tweening to position: " .. tostring(targetPos))
+end
+
+-- Hàm bay lên cao khi máu thấp
+local function FlyHigh()
+    if not IsCharacterValid(LocalPlayer) then
+        Log("Cannot fly high, invalid character")
+        return
+    end
+
+    local highPos = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, Config.HighFlyHeight, 0)
+    highPos = AdjustFlyHeight(highPos)
+    TweenToPosition(highPos)
+    IsFlyingHigh = true
+    UseHealthItem()
+    Log("Flying high to avoid damage")
+    UpdateStatusUI("Flying high to avoid damage")
+end
+
+-- Hàm chống AFK
+local function AntiAFK()
+    if tick() - LastAntiAFKTime >= Config.AntiAFKInterval and not Target then
+        local randomPos = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(math.random(-50, 50), Config.DefaultFlyHeight, math.random(-50, 50))
+        TweenToPosition(randomPos)
+        if Config.AttackMethod == "Skill" then
+            local skill = LocalPlayer.Character:FindFirstChild(Config.AttackSkillName) or
+                          LocalPlayer.Backpack:FindFirstChild(Config.AttackSkillName)
+            if skill then
+                skill.Parent = LocalPlayer.Character
+                skill:Activate()
+            end
+        end
+        LastAntiAFKTime = tick()
+        Log("Anti-AFK: Moving to random position")
+        UpdateStatusUI("Anti-AFK: Moving to random position")
+    end
+end
+-- Blox Fruits Ultimate Auto Fly and Kill Script - Part 3: Attack and Server Management
+-- Description: Tấn công, đổi mục tiêu, đổi server, xử lý sự kiện, vòng lặp chính
+
+-- Hàm lấy người chơi gần nhất hợp lệ
+local function GetNearestValidPlayer()
+    local closestPlayer = nil
+    local closestDistance = math.huge
+    local validPlayers = 0
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and IsCharacterValid(player) then
+            local targetPos = player.Character.HumanoidRootPart.Position
+            if IsPVPEnabled(player) and not IsInSafeZone(player) and not IsAllyTeam(player) and not IsInIgnoredArea(targetPos) then
+                validPlayers = validPlayers + 1
+                local distance = (LocalPlayer.Character.HumanoidRootPart.Position - targetPos).Magnitude
+                if distance < closestDistance then
+                    closestDistance = distance
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+
+    local status = "Valid players: " .. validPlayers .. ", Selected: " .. (closestPlayer and closestPlayer.Name or "None")
+    Log(status)
+    UpdateStatusUI(status)
+    if validPlayers == 0 then
+        if tick() - LastNoTargetTime >= Config.NoTargetTimeout then
+            Log("No valid players found for " .. Config.NoTargetTimeout .. "s, attempting server hop")
+            UpdateStatusUI("No valid players, hopping server")
+            ChangeServer()
+        end
+    else
+        LastNoTargetTime = tick()
+    end
+    return closestPlayer
+end
+
+-- Hàm sử dụng vật phẩm hồi máu
+local function UseHealthItem()
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if backpack then
+        local item = backpack:FindFirstChild(Config.HealItemName)
+        if item then
+            item.Parent = LocalPlayer.Character
+            item:Activate()
+            Log("Using health item: " .. Config.HealItemName)
+            UpdateStatusUI("Using health item")
+        else
+            Log("No health item found")
+        end
+    end
+end
+
+-- Hàm tấn công người chơi
+local function AttackPlayer(targetPlayer)
+    if not IsAttacking or not targetPlayer or not IsCharacterValid(targetPlayer) then
+        Log("Invalid attack conditions")
+        return
+    end
+
+    local targetPos = targetPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, 5, 0)
+    TweenToPosition(targetPos)
+
+    local success, err = pcall(function()
+        if Config.AttackMethod == "Remote" then
+            local damageRemote = ReplicatedStorage:FindFirstChild(Config.AttackRemoteName)
+            if damageRemote then
+                damageRemote:FireServer(targetPlayer.Character.Humanoid)
+                LastDamageTime = tick()
+            end
+        elseif Config.AttackMethod == "Tool" then
+            local tool = LocalPlayer.Character:FindFirstChild(Config.AttackToolName) or
+                         LocalPlayer.Backpack:FindFirstChild(Config.AttackToolName)
+            if tool then
+                tool.Parent = LocalPlayer.Character
+                tool:Activate()
+                LastDamageTime = tick()
+            end
+        elseif Config.AttackMethod == "Skill" then
+            local skill = LocalPlayer.Character:FindFirstChild(Config.AttackSkillName) or
+                          LocalPlayer.Backpack:FindFirstChild(Config.AttackSkillName)
+            if skill then
+                skill.Parent = LocalPlayer.Character
+                skill:Activate()
+                LastDamageTime = tick()
+            end
+        end
+    end)
+    
+    AttackCount = AttackCount + 1
+    local status = "Attacking " .. targetPlayer.Name .. " (Attack #" .. AttackCount .. ")" .. (success and "" or " - Failed: " .. tostring(err))
+    Log(status)
+    UpdateStatusUI(status)
+end
+
+-- Hàm đổi server
+local function ChangeServer()
+    if ServerHopAttempts >= Config.MaxServerHopAttempts then
+        Log("Max server hop attempts reached")
+        UpdateStatusUI("Max server hop attempts reached")
+        return
+    end
+
+    Log("Attempting to change server")
+    UpdateStatusUI("Attempting to change server")
+    ServerHopAttempts = ServerHopAttempts + 1
+
+    local success, result = pcall(function()
+        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        for _, server in pairs(servers.data) do
+            if server.playing < server.maxPlayers then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
+                Log("Teleporting to server: " .. server.id)
+                ServerHopAttempts = 0
+                KillCount = 0
+                return
+            end
+        end
+    end)
+
+    if not success then
+        Log("Failed to change server: " .. tostring(result))
+        UpdateStatusUI("Failed to change server")
+        wait(5)
+        ChangeServer()
+    end
+end
+
+-- Hàm kiểm tra tất cả người chơi đã chết
+local function AllPlayersDead()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and IsCharacterValid(player) then
+            return false
+        end
+    end
+    Log("All players dead, preparing to hop server")
+    UpdateStatusUI("All players dead, hopping server")
+    return true
+end
+
+-- Hàm kiểm tra trạng thái máu
+local function CheckHealthStatus()
+    if not IsCharacterValid(LocalPlayer) then return 0 end
+    local humanoid = LocalPlayer.Character.Humanoid
+    local currentHealth = humanoid.Health / humanoid.MaxHealth
+    if currentHealth ~= LastHealth then
+        Log("Health updated: " .. math.floor(currentHealth * 100) .. "%")
+        UpdateStatusUI("Health: " .. math.floor(currentHealth * 100) .. "%")
+        LastHealth = currentHealth
+    end
+    return currentHealth
+end
+
+-- Hàm xử lý người chơi rời game
+local function OnPlayerRemoving(player)
+    if player == Target then
+        Log("Target " .. player.Name .. " left or died, finding new target")
+        KillCount = KillCount + 1
+        Log("Kill count: " .. KillCount)
+        UpdateStatusUI("Kill count: " .. KillCount)
+        if KillCount >= Config.KillCountToHop then
+            Log("Reached " .. Config.KillCountToHop .. " kills, hopping server")
+            ChangeServer()
+        else
+            Target = GetNearestValidPlayer()
+            LastDamageTime = tick()
+            TargetStartTime = tick()
+        end
+    end
+end
+
+-- Hàm xử lý nhân vật chết
+local function OnCharacterDied()
+    Log("Local player died, initiating server hop")
+    UpdateStatusUI("Player died, hopping server")
+    ChangeServer()
+end
+
+-- Hàm kiểm tra mục tiêu hợp lệ
+local function IsTargetValid()
+    if not Target or not IsCharacterValid(Target) then
+        Log("Target invalid: No character")
+        return false
+    end
+    if IsInIgnoredArea(Target.Character.HumanoidRootPart.Position) then
+        Log("Target in ignored area")
+        return false
+    end
+    if not IsPVPEnabled(Target) then
+        Log("Target has PVP disabled")
+        return false
+    end
+    if IsInSafeZone(Target) then
+        Log("Target in safe zone")
+        return false
+    }
+    if IsAllyTeam(Target) then
+        Log("Target is in ally team")
+        return false
+    }
+    return true
+end
+
+-- Hàm in trạng thái hiện tại
+local function PrintStatus()
+    local status = "Status:\n" ..
+                   "Script Running: " .. tostring(IsScriptRunning) .. "\n" ..
+                   "Attacking: " .. tostring(IsAttacking) .. "\n" ..
+                   "Target: " .. (Target and Target.Name or "None") .. "\n" ..
+                   "Kill Count: " .. KillCount .. "\n" ..
+                   "Position: " .. (IsCharacterValid(LocalPlayer) and tostring(LocalPlayer.Character.HumanoidRootPart.Position) or "Unknown") .. "\n" ..
+                   "Health: " .. math.floor(CheckHealthStatus() * 100) .. "%"
+    Log(status)
+    UpdateStatusUI(status)
+end
+
+-- Hàm khởi tạo
+local function Initialize()
+    Log("Initializing禁止Init script...")
+    if not IsCharacterValid(LocalPlayer) then
+        Log("Waiting for local character to load")
+        LocalPlayer.CharacterAdded:Wait()
+    end
+
+    Players.PlayerRemoving:Connect(OnPlayerRemoving)
+    LocalPlayer.Character.Humanoid.Died:Connect(OnCharacterDied)
+    Log("Script initialized successfully")
+    UpdateStatusUI("Script initialized")
+end
+
+-- Main Loop
+local function MainLoop()
+    Initialize()
+    Log("Starting main loop")
+
+    local heightCheckCounter = 0
+    RunService.Heartbeat:Connect(function()
+        if not IsScriptRunning or not IsCharacterValid(LocalPlayer) then
+            Log("Script paused: Invalid state")
+            UpdateStatusUI("Script paused")
+            return
+        end
+
+        local currentHealth = CheckHealthStatus()
+
+        -- Kiểm tra máu thấp
+        if currentHealth <= Config.LowHealthThreshold and not IsFlyingHigh then
+            FlyHigh()
+        elseif currentHealth >= Config.RecoveryHealthThreshold and IsFlyingHigh then
+            IsFlyingHigh = false
+            Target = GetNearestValidPlayer()
+            LastDamageTime = tick()
+            TargetStartTime = tick()
+            Log("Health recovered, resuming attack")
+            UpdateStatusUI("Health recovered, resuming attack")
+        end
+
+        -- Nếu đang bay cao, không làm gì
+        if IsFlyingHigh then return end
+
+        -- Kiểm tra độ cao hiện tại mỗi 2 giây
+        heightCheckCounter = heightCheckCounter + 1
+        if heightCheckCounter >= 20 then
+            CheckCurrentHeight()
+            heightCheckCounter = 0
+        end
+
+        -- Kiểm tra mục tiêu
+        if not IsTargetValid() then
+            Log("Current target invalid, searching for new target")
+            UpdateStatusUI("Current target invalid, searching")
+            Target = GetNearestValidPlayer()
+            LastDamageTime = tick()
+            TargetStartTime = tick()
+        end
+
+        -- Kiểm tra timeout
+        if Target then
+            if tick() - LastDamageTime >= Config.NoDamageTimeout then
+                Log("No damage dealt for " .. Config.NoDamageTimeout .. "s, switching target")
+                UpdateStatusUI("No damage dealt for " .. Config.NoDamageTimeout .. "s, switching target")
+                Target = GetNearestValidPlayer()
+                LastDamageTime = tick()
+                TargetStartTime = tick()
+            elseif tick() - TargetStartTime >= Config.NoKillTimeout then
+                Log("Failed to kill " .. Target.Name .. " in " .. Config.NoKillTimeout .. "s, switching target")
+                UpdateStatusUI("Failed to kill " .. Target.Name .. ", switching target")
+                Target = GetNearestValidPlayer()
+                LastDamageTime = tick()
+                TargetStartTime = tick()
+            end
+        end
+
+        -- Tấn công mục tiêu
+        if Target then
+            AttackPlayer(Target)
+        else
+            AntiAFK()
+        end
+
+        -- Kiểm tra nếu giết hết người chơi
+        if AllPlayersDead() then
+            ChangeServer()
+        end
+
+        wait(0.1) -- Tối ưu hiệu suất
+    end)
+end
+
+-- Xử lý phím tắt
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed then
+        if input.KeyCode == Enum.KeyCode.Q then
+            IsScriptRunning = not IsScriptRunning
+            Log("Script " .. (IsScriptRunning and "resumed" or "paused"))
+            UpdateStatusUI("Script " .. (IsScriptRunning and "resumed" or "paused"))
+        elseif input.KeyCode == Enum.KeyCode.E then
+            IsAttacking = not IsAttacking
+            Log("Attack mode " .. (IsAttacking and "enabled" or "disabled"))
+            UpdateStatusUI("Attack mode " .. (IsAttacking and "enabled" or "disabled"))
+        elseif input.KeyCode == Enum.KeyCode.R then
+            Log("Manual server hop triggered")
+            UpdateStatusUI("Manual server hop")
+            ChangeServer()
+        elseif input.KeyCode == Enum.KeyCode.T then
+            PrintStatus()
+        elseif input.KeyCode == Enum.KeyCode.Y then
+            Log("Reloading script")
+            UpdateStatusUI("Reloading script")
+            Initialize()
+        end
+    end
+end)
+
+-- Xử lý lỗi và khởi động
+local success, errorMsg = pcall(MainLoop)
+if not success then
+    Log("Script crashed: " .. tostring(errorMsg))
+    UpdateStatusUI("Script crashed: " .. tostring(errorMsg))
+    warn("Script encountered an error. Please check the logs.")
+end
+
+-- Thông báo khởi động
+Log("Script loaded. Controls: Q (Toggle Script), E (Toggle Attack), R (Manual Server Hop), T (Print Status), Y (Reload Script)")
+UpdateStatusUI("Script loaded")
