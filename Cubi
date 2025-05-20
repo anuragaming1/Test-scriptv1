@@ -1,0 +1,180 @@
+-- AnuraShield v1.3 - Fix GUI lỗi không hiển thị cho KRNL/Fluxus Android
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local StartTime = tick()
+
+-- Tạo GUI trong PlayerGui thay vì CoreGui để tránh lỗi executor
+local function CreateTimerHUD()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "AnuraTimerHUD"
+    ScreenGui.ResetOnSpawn = false
+
+    -- Đợi PlayerGui tồn tại
+    repeat wait() until LocalPlayer:FindFirstChild("PlayerGui")
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local TimerLabel = Instance.new("TextLabel", ScreenGui)
+    TimerLabel.Size = UDim2.new(0, 200, 0, 30)
+    TimerLabel.Position = UDim2.new(0, 10, 0, 10)
+    TimerLabel.BackgroundTransparency = 0.3
+    TimerLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    TimerLabel.BorderSizePixel = 0
+    TimerLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+    TimerLabel.Font = Enum.Font.SourceSansBold
+    TimerLabel.TextSize = 18
+    TimerLabel.Text = "Thời gian dùng: 00:00"
+
+    -- Cập nhật thời gian liên tục
+    spawn(function()
+        while wait(1) do
+            local delta = tick() - StartTime
+            local minutes = math.floor(delta / 60)
+            local seconds = math.floor(delta % 60)
+            TimerLabel.Text = string.format("Thời gian dùng: %02d:%02d", minutes, seconds)
+        end
+    end)
+end
+
+-- Chống Kick
+local function HookKick()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+    local old = mt.__namecall
+    mt.__namecall = newcclosure(function(self, ...)
+        if getnamecallmethod() == "Kick" then
+            warn("[AnuraShield] Đã chặn Kick.")
+            return nil
+        end
+        return old(self, ...)
+    end)
+    setreadonly(mt, true)
+end
+
+-- Dọn UI cảnh báo
+local function CleanUI()
+    game.DescendantAdded:Connect(function(obj)
+        if obj:IsA("Message") or obj:IsA("Hint") then
+            local txt = obj.Text:lower()
+            if txt:find("ban") or txt:find("kick") or txt:find("error") then
+                obj:Destroy()
+            end
+        end
+    end)
+end
+
+-- Server hop sau 40 phút
+local function AutoHop()
+    wait(2400)
+    game:GetService("TeleportService"):Teleport(game.PlaceId)
+end
+
+-- Chống AFK
+local function AntiAFK()
+    while wait(15) do
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local root = char.HumanoidRootPart
+            root.CFrame = root.CFrame * CFrame.new(math.random(-2,2), 0, math.random(-2,2))
+        end
+    end
+end
+
+-- Kích hoạt tất cả
+pcall(HookKick)
+pcall(CleanUI)
+pcall(CreateTimerHUD)
+pcall(AntiAFK)
+pcall(AutoHop)
+
+print("[AnuraShield] Đã kích hoạt bảo vệ.")
+-- Anura Hub | FPS Boost Script
+pcall(function()
+    setfpscap(60) -- Giới hạn FPS để tránh tụt khung hình
+
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+        elseif v:IsA("Decal") then
+            v.Transparency = 1
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            v:Destroy()
+        end
+    end
+
+    -- Xóa cây, cỏ, đá, hiệu ứng...
+    local ignoreNames = {"Players", "Lighting", "Workspace.Camera", "ReplicatedStorage"}
+    for _, v in pairs(game.Workspace:GetDescendants()) do
+        if v:IsA("Model") or v:IsA("MeshPart") or v:IsA("Part") then
+            if not table.find(ignoreNames, v.Name) and v:IsDescendantOf(workspace) then
+                if string.find(v.Name:lower(), "tree") or string.find(v.Name:lower(), "bush") or string.find(v.Name:lower(), "rock") then
+                    v:Destroy()
+                end
+            end
+        end
+    end
+
+    -- Tối ưu Lighting
+    local lighting = game:GetService("Lighting")
+    lighting.GlobalShadows = false
+    lighting.FogEnd = 100000
+    lighting.Brightness = 1
+    lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+
+    -- Tắt các tính năng post-processing
+    for _, v in pairs(lighting:GetDescendants()) do
+        if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") then
+            v.Enabled = false
+        end
+    end
+
+    -- Dọn rác Memory
+    collectgarbage("collect")
+    if sethiddenproperty then
+        sethiddenproperty(game:GetService("UserSettings"), "GamepadCameraSensitivity", 0)
+    end
+
+    print("FPS Boost Loaded - Anura Hub")
+end)
+-- Xóa skybox và hiệu ứng cũ nếu có
+for _, v in pairs(game.Lighting:GetChildren()) do
+	if v:IsA("Sky") or v:IsA("Atmosphere") or v:IsA("ColorCorrectionEffect") then
+		v:Destroy()
+	end
+end
+
+-- Tạo Sky mới với ID tùy chỉnh theo hướng
+local sky = Instance.new("Sky")
+sky.Name = "CustomSky"
+
+-- Gán các hướng mặt hình
+sky.SkyboxLf = "rbxassetid://102145756639209"  -- Trái
+sky.SkyboxBk = "rbxassetid://73484786349362"   -- Sau
+sky.SkyboxRt = "rbxassetid://123852546791653"  -- Phải
+sky.SkyboxFt = "rbxassetid://101977160732638"  -- Trước
+
+-- Hướng trên và dưới
+sky.SkyboxUp = "rbxassetid://131912812460186"
+sky.SkyboxDn = "rbxassetid://131912812460186"
+
+-- Tuỳ chỉnh ánh sáng
+sky.StarCount = 400
+sky.MoonAngularSize = 11
+sky.SunAngularSize = 21
+sky.Parent = game.Lighting
+
+-- Điều chỉnh ánh sáng tổng thể (sáng vừa phải, rõ vật thể)
+game.Lighting.ClockTime = 14 -- Giữa trưa
+game.Lighting.Brightness = 2
+game.Lighting.Ambient = Color3.fromRGB(180, 180, 180)
+game.Lighting.OutdoorAmbient = Color3.fromRGB(210, 200, 190)
+game.Lighting.EnvironmentSpecularScale = 1
+
+-- Hiệu ứng màu sắc nhẹ cho độ "mướt"
+local cc = Instance.new("ColorCorrectionEffect")
+cc.Brightness = 0.1
+cc.Contrast = 0.35
+cc.Saturation = 0.2
+cc.TintColor = Color3.fromRGB(255, 230, 200)
+cc.Parent = game.Lighting
