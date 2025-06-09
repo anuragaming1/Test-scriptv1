@@ -1,0 +1,407 @@
+-- Blox Fruits Auto Bounty Script
+-- Yêu cầu: Synapse X, Script-Ware hoặc executor tương tự
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- Cấu hình
+local Config = {
+    AutoBounty = false,
+    TargetPlayer = nil,
+    LastDamageTime = 0,
+    AttackStartTime = 0,
+    HighAltitude = 500,
+    SafeHealthPercent = 0.1, -- 10%
+    ReturnHealthPercent = 0.3, -- 30%
+    MaxAttackTime = 45, -- 45 giây
+    MaxNoDamageTime = 30, -- 30 giây
+    FlySpeed = 16
+}
+
+-- Danh sách server để hop
+local ServerList = {}
+local CurrentServerJobId = game.JobId
+
+-- Hàm kiểm tra PvP
+local function isPvPEnabled(player)
+    local character = player.Character
+    if not character then return false end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return false end
+    
+    -- Kiểm tra PvP flag (có thể khác nhau tùy game version)
+    local pvpEnabled = player:GetAttribute("PvPEnabled") or false
+    return pvpEnabled
+end
+
+-- Hàm kiểm tra safe zone
+local function isInSafeZone(player)
+    local character = player.Character
+    if not character then return true end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return true end
+    
+    -- Danh sách các vùng safe zone (tọa độ có thể cần điều chỉnh)
+    local safeZones = {
+        {position = Vector3.new(0, 0, 0), radius = 100}, -- Spawn area
+        {position = Vector3.new(-379, 73, 298), radius = 50}, -- Marine base
+        {position = Vector3.new(61163, 12, 1819), radius = 100}, -- Second sea spawn
+    }
+    
+    for _, zone in pairs(safeZones) do
+        local distance = (rootPart.Position - zone.position).Magnitude
+        if distance <= zone.radius then
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- Hàm kiểm tra ally
+local function isAlly(player)
+    if not player or player == LocalPlayer then return true end
+    
+    -- Kiểm tra cùng team hoặc crew
+    if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then
+        return true
+    end
+    
+    -- Kiểm tra crew (có thể cần điều chỉnh tùy game)
+    local localCrew = LocalPlayer:GetAttribute("Crew")
+    local playerCrew = player:GetAttribute("Crew")
+    
+    if localCrew and playerCrew and localCrew == playerCrew then
+        return true
+    end
+    
+    return false
+end
+
+-- Hàm bay
+local function startFlying()
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = RootPart
+    
+    local bodyPosition = Instance.new("BodyPosition")
+    bodyPosition.MaxForce = Vector3.new(4000, 4000, 4000)
+    bodyPosition.Position = RootPart.Position
+    bodyPosition.Parent = RootPart
+    
+    return bodyVelocity, bodyPosition
+end
+
+-- Hàm dừng bay
+local function stopFlying()
+    for _, v in pairs(RootPart:GetChildren()) do
+        if v:IsA("BodyVelocity") or v:IsA("BodyPosition") then
+            v:Destroy()
+        end
+    end
+end
+
+-- Hàm teleport đến player
+local function teleportToPlayer(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then return end
+    
+    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+    
+    local bodyVelocity, bodyPosition = startFlying()
+    bodyPosition.Position = targetRoot.Position + Vector3.new(0, 5, 0)
+end
+
+-- Hàm bay lên cao
+local function flyHigh()
+    local bodyVelocity, bodyPosition = startFlying()
+    bodyPosition.Position = RootPart.Position + Vector3.new(0, Config.HighAltitude, 0)
+end
+
+-- Hàm tấn công
+local function attackPlayer(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then return end
+    
+    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+    
+    -- Sử dụng combat (có thể cần điều chỉnh tùy theo game version)
+    local combat = ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("CommF_")
+    if combat then
+        combat:InvokeServer("weaponBuyWeapon", "Combat")
+    end
+    
+    -- Click để tấn công
+    local args = {
+        [1] = 0,
+        [2] = targetRoot.Position,
+        [3] = targetPlayer.Character
+    }
+    
+    if combat then
+        combat:InvokeServer("TAP", unpack(args))
+    end
+end
+
+-- Hàm tìm player target phù hợp
+local function findTargetPlayer()
+    local validPlayers = {}
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                -- Kiểm tra các điều kiện
+                if not isAlly(player) and 
+                   isPvPEnabled(player) and 
+                   not isInSafeZone(player) then
+                    table.insert(validPlayers, player)
+                end
+            end
+        end
+    end
+    
+    if #validPlayers > 0 then
+        return validPlayers[math.random(1, #validPlayers)]
+    end
+    
+    return nil
+end
+
+-- Hàm server hop
+local function serverHop()
+    local servers = {}
+    
+    -- Lấy danh sách server (cần HTTP Service)
+    local success, result = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/2753915549/servers/Public?sortOrder=Asc&limit=100"))
+    end)
+    
+    if success and result.data then
+        for _, server in pairs(result.data) do
+            if server.id ~= CurrentServerJobId and server.playing < server.maxPlayers then
+                table.insert(servers, server.id)
+            end
+        end
+    end
+    
+    if #servers > 0 then
+        local randomServer = servers[math.random(1, #servers)]
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, LocalPlayer)
+    else
+        -- Fallback: teleport thông thường
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end
+end
+
+-- Hàm chính auto bounty
+local function autoBountyLoop()
+    spawn(function()
+        while Config.AutoBounty do
+            wait(0.1)
+            
+            if not Character or not Character.Parent then
+                Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                Humanoid = Character:WaitForChild("Humanoid")
+                RootPart = Character:WaitForChild("HumanoidRootPart")
+                continue
+            end
+            
+            local currentTime = tick()
+            local currentHealth = Humanoid.Health / Humanoid.MaxHealth
+            
+            -- Kiểm tra máu thấp
+            if currentHealth <= Config.SafeHealthPercent then
+                flyHigh()
+                wait(1)
+                continue
+            end
+            
+            -- Nếu máu đã hồi phục đủ, xuống tấn công
+            if currentHealth >= Config.ReturnHealthPercent then
+                -- Tìm target nếu chưa có
+                if not Config.TargetPlayer or not Config.TargetPlayer.Character then
+                    Config.TargetPlayer = findTargetPlayer()
+                    Config.AttackStartTime = currentTime
+                    Config.LastDamageTime = currentTime
+                end
+                
+                local target = Config.TargetPlayer
+                
+                if target and target.Character then
+                    -- Kiểm tra các điều kiện thay đổi target
+                    local shouldChangeTarget = false
+                    local reason = ""
+                    
+                    -- Kiểm tra ally, safe zone, pvp
+                    if isAlly(target) then
+                        shouldChangeTarget = true
+                        reason = "Target is ally"
+                    elseif not isPvPEnabled(target) then
+                        shouldChangeTarget = true
+                        reason = "Target PvP disabled"
+                    elseif isInSafeZone(target) then
+                        shouldChangeTarget = true
+                        reason = "Target in safe zone"
+                    end
+                    
+                    -- Kiểm tra thời gian
+                    if currentTime - Config.AttackStartTime > Config.MaxAttackTime then
+                        shouldChangeTarget = true
+                        reason = "Max attack time exceeded"
+                    elseif currentTime - Config.LastDamageTime > Config.MaxNoDamageTime then
+                        shouldChangeTarget = true
+                        reason = "No damage dealt for too long"
+                    end
+                    
+                    -- Kiểm tra target còn sống
+                    local targetHumanoid = target.Character:FindFirstChild("Humanoid")
+                    if not targetHumanoid or targetHumanoid.Health <= 0 then
+                        shouldChangeTarget = true
+                        reason = "Target died"
+                    end
+                    
+                    if shouldChangeTarget then
+                        print("Changing target: " .. reason)
+                        Config.TargetPlayer = nil
+                        
+                        -- Kiểm tra nếu kill hết player trong server
+                        local alivePlayers = 0
+                        for _, player in pairs(Players:GetPlayers()) do
+                            if player ~= LocalPlayer and player.Character then
+                                local humanoid = player.Character:FindFirstChild("Humanoid")
+                                if humanoid and humanoid.Health > 0 then
+                                    alivePlayers = alivePlayers + 1
+                                end
+                            end
+                        end
+                        
+                        if alivePlayers == 0 then
+                            print("No players left, switching server...")
+                            serverHop()
+                            return
+                        end
+                        
+                        continue
+                    end
+                    
+                    -- Tấn công target
+                    teleportToPlayer(target)
+                    attackPlayer(target)
+                    
+                    -- Cập nhật thời gian damage (giả định)
+                    -- Trong thực tế, bạn cần hook damage event
+                    Config.LastDamageTime = currentTime
+                    
+                else
+                    -- Không tìm được target phù hợp, đổi server
+                    print("No valid targets found, switching server...")
+                    serverHop()
+                end
+            end
+        end
+    end)
+end
+
+-- Event khi bị kill
+local function onCharacterDied()
+    print("Character died, changing target...")
+    Config.TargetPlayer = nil
+    
+    -- Random: đổi player hoặc đổi server
+    if math.random(1, 2) == 1 then
+        Config.TargetPlayer = findTargetPlayer()
+    else
+        serverHop()
+    end
+end
+
+-- Kết nối events
+Humanoid.Died:Connect(onCharacterDied)
+
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    Character = newCharacter
+    Humanoid = Character:WaitForChild("Humanoid")
+    RootPart = Character:WaitForChild("HumanoidRootPart")
+    
+    Humanoid.Died:Connect(onCharacterDied)
+end)
+
+-- GUI Controls
+local ScreenGui = Instance.new("ScreenGui")
+local Frame = Instance.new("Frame")
+local ToggleButton = Instance.new("TextButton")
+local StatusLabel = Instance.new("TextLabel")
+
+ScreenGui.Name = "AutoBountyGUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+Frame.Size = UDim2.new(0, 300, 0, 150)
+Frame.Position = UDim2.new(0, 10, 0, 10)
+Frame.BackgroundColor3 = Color3.new(0, 0, 0)
+Frame.BackgroundTransparency = 0.3
+Frame.BorderSizePixel = 2
+Frame.BorderColor3 = Color3.new(1, 1, 1)
+Frame.Parent = ScreenGui
+
+ToggleButton.Size = UDim2.new(0, 200, 0, 50)
+ToggleButton.Position = UDim2.new(0, 50, 0, 20)
+ToggleButton.Text = "Start Auto Bounty"
+ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+ToggleButton.BackgroundColor3 = Color3.new(0, 0.7, 0)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.TextSize = 18
+ToggleButton.Parent = Frame
+
+StatusLabel.Size = UDim2.new(0, 280, 0, 30)
+StatusLabel.Position = UDim2.new(0, 10, 0, 80)
+StatusLabel.Text = "Status: Stopped"
+StatusLabel.TextColor3 = Color3.new(1, 1, 1)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Font = Enum.Font.SourceSans
+StatusLabel.TextSize = 16
+StatusLabel.Parent = Frame
+
+-- Toggle function
+ToggleButton.MouseButton1Click:Connect(function()
+    Config.AutoBounty = not Config.AutoBounty
+    
+    if Config.AutoBounty then
+        ToggleButton.Text = "Stop Auto Bounty"
+        ToggleButton.BackgroundColor3 = Color3.new(0.7, 0, 0)
+        StatusLabel.Text = "Status: Running"
+        autoBountyLoop()
+    else
+        ToggleButton.Text = "Start Auto Bounty"
+        ToggleButton.BackgroundColor3 = Color3.new(0, 0.7, 0)
+        StatusLabel.Text = "Status: Stopped"
+        stopFlying()
+        Config.TargetPlayer = nil
+    end
+end)
+
+-- Cập nhật status
+spawn(function()
+    while true do
+        wait(1)
+        if Config.AutoBounty and Config.TargetPlayer then
+            StatusLabel.Text = "Status: Targeting " .. Config.TargetPlayer.Name
+        elseif Config.AutoBounty then
+            StatusLabel.Text = "Status: Finding target..."
+        end
+    end
+end)
+
+print("Auto Bounty Script loaded!")
+print("Click button to start/stop")
