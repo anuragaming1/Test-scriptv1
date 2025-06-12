@@ -1,0 +1,192 @@
+local redzlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/daucobonhi/UiRedzV5/refs/heads/main/DemoUi.lua"))()
+
+local ui = redzlib:MakeWindow({
+    Title = "Anura Hub",
+    SubTitle = "TP BYPASS MENU",
+    SaveFolder = "Blox Fruits"
+})
+
+ui:AddMinimizeButton({
+    Button = { Image = "rbxassetid://131151731604309", BackgroundTransparency = 0 },
+    Corner = { CornerRadius = UDim.new(0, 6) }
+})
+-- === TAB: Sea Status ===
+local seatab = ui:MakeTab({"Sea Status"})
+
+-- Biến xác định Sea hiện tại
+local Sea1, Sea2, Sea3 = false, false, false
+local CurrentSea = 0
+
+if game.PlaceId == 2753915549 then
+    Sea1 = true
+    CurrentSea = 1
+elseif game.PlaceId == 4442272183 then
+    Sea2 = true
+    CurrentSea = 2
+elseif game.PlaceId == 7449423635 then
+    Sea3 = true
+    CurrentSea = 3
+else
+    CurrentSea = 0
+end
+
+-- Hiển thị Sea hiện tại
+seatab:AddParagraph({
+    Title = "Chọn sea mà bạn muốn dịch chuyển",
+    Desc = CurrentSea == 1 and "🌴 Sea 1" or
+           CurrentSea == 2 and "🌊 Sea 2" or
+           CurrentSea == 3 and "🌌 Sea 3" or
+           "❓ Không xác định"
+})
+
+-- (Tuỳ chọn) Nút nhanh chuyển Sea nếu bạn muốn thêm
+seatab:AddSection("Chuyển Sea")
+
+seatab:AddButton({
+    Name = "🌀 Chuyển đến Sea 1",
+    Callback = function()
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("TravelMain")
+    end
+})
+
+seatab:AddButton({
+    Name = "🌊 Chuyển đến Sea 2",
+    Callback = function()
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("TravelDressrosa")
+    end
+})
+
+seatab:AddButton({
+    Name = "🌌 Chuyển đến Sea 3",
+    Callback = function()
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("TravelZou")
+    end
+})
+-- === DANH SÁCH TỌA ĐỘ THEO SEA (chuẩn từ MASTERY HUB V3) ===
+local IslandCFrame = {
+    ["Sea 1"] = {
+        ["Cối xay gió"] = CFrame.new(889, 17, 1434),
+        ["Hàng hải"] = CFrame.new(-2728, 25, 2056),
+        ["Trung tâm thị trấn"] = CFrame.new(-688, 15, 1585),
+        ["Rừng"] = CFrame.new(-1614, 37, 146),
+        ["Làng cướp biển"] = CFrame.new(-1173, 45, 3837),
+        ["Sa mạc"] = CFrame.new(945, 21, 4375),
+        ["Đảo Tuyết"] = CFrame.new(1298, 87, -1344),
+        ["Ford hàng hải"] = CFrame.new(-4810, 21, 4359),
+        ["Đấu trường La Mã"] = CFrame.new(-1535, 7, -3014),
+        ["Đảo Trời 1"] = CFrame.new(-4814, 718, -2551),
+        ["Đảo Trời 2"] = CFrame.new(-4652, 873, -1754),
+        ["Đảo Trời 3"] = CFrame.new(-7895, 5547, -380),
+        ["Nhà tù"] = CFrame.new(4870, 6, 736),
+        ["Làng Magma"] = CFrame.new(-5290, 9, 8349),
+        ["Đảo dưới nước"] = CFrame.new(61164, 5, 1820),
+        ["Thành phố đài phun nước"] = CFrame.new(5128, 60, 4106),
+    },
+    ["Sea 2"] = {
+        ["Quán cà phê"] = CFrame.new(-382, 73, 290),
+        ["Đốm đầu tiên"] = CFrame.new(-11, 29, 2771),
+        ["Đảo Râu Đen"] = CFrame.new(3494, 13, -3259),
+        ["Biệt thự Flamingo"] = CFrame.new(-317, 331, 597),
+        ["Phòng Flamingo"] = CFrame.new(2285, 15, 905),
+        ["Khu vực xanh"] = CFrame.new(-2258, 73, -2696),
+        ["Đảo thây ma"] = CFrame.new(-5552, 194, -776),
+        ["Hai ngọn núi tuyết"] = CFrame.new(752, 408, -5277),
+        ["Punk nguy hiểm"] = CFrame.new(-5897, 18, -5096),
+        ["Con tàu bị nguyền rủa"] = CFrame.new(919, 125, 32869),
+        ["Lâu đài băng"] = CFrame.new(5505, 40, -6178),
+        ["Đảo bị lãng quên"] = CFrame.new(-3050, 240, -10178),
+        ["Đảo Ussop"] = CFrame.new(4816, 8, 2863),
+    },
+    ["Sea 3"] = {
+        ["Dinh Thự"] = CFrame.new(-12471, 374, -7551),
+        ["Cảng"] = CFrame.new(-334, 7, 5300),
+        ["Pháo đài trên biển"] = CFrame.new(-5073, 315, -3153),
+        ["Đảo Hydra"] = CFrame.new(5756, 610, -282),
+        ["Cây lớn"] = CFrame.new(2681, 1682, -7190),
+        ["Đảo rùa"] = CFrame.new(-12528, 332, -8658),
+        ["Đảo Xương"] = CFrame.new(-9517, 142, 5528),
+        ["Đảo kem"] = CFrame.new(-902, 79, -10988),
+        ["Đảo Đậu Phộng"] = CFrame.new(-2062, 50, -10232),
+        ["Đảo Bánh"] = CFrame.new(-1897, 14, -11576),
+        ["Đảo kẹo mía"] = CFrame.new(-1038, 10, -14076),
+        ["Doanh Trại Tiki"] = CFrame.new(-16224, 9, 439),
+    }
+}
+
+local tpMode = "Tween" -- Mặc định
+
+-- === HÀM TP THEO CHẾ ĐỘ ===
+local function TweenTP(cf)
+    local hrp = game.Players.LocalPlayer.Character.HumanoidRootPart
+    local dist = (hrp.Position - cf.Position).Magnitude
+    game:GetService("TweenService"):Create(hrp, TweenInfo.new(dist / 300, Enum.EasingStyle.Linear), {CFrame = cf}):Play()
+end
+
+local function InstantTP(cf)
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = cf
+end
+
+local function BypassResetTP(cf)
+    local player = game.Players.LocalPlayer
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+
+    -- Bay siêu nhanh đến đảo
+    local speed = 3000
+    local dist = (hrp.Position - cf.Position).Magnitude
+    local duration = dist / speed
+
+    game:GetService("TweenService"):Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = cf + Vector3.new(0, 5, 0)}):Play()
+    wait(duration + 0.1)
+
+    -- Bypass 3 lần
+    for i = 1, 3 do
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = cf + Vector3.new(0, 3, 0)
+            wait(0.15)
+        end
+    end
+
+    -- Reset
+    wait(0.2)
+    player.Character:BreakJoints()
+end
+
+local function TPTo(cf)
+    if tpMode == "Tween" then
+        TweenTP(cf)
+    elseif tpMode == "Instant" then
+        InstantTP(cf)
+    elseif tpMode == "Bypass + Reset" then
+        BypassResetTP(cf)
+    end
+end
+
+-- === TẠO TAB CHO SEA 1 → SEA 2 → SEA 3 ===
+for _, sea in ipairs({"Sea 1", "Sea 2", "Sea 3"}) do
+    local tab = ui:MakeTab({sea})
+    for island, cf in pairs(IslandCFrame[sea]) do
+        tab:AddButton({
+            Name = island,
+            Callback = function()
+                TPTo(cf)
+            end
+        })
+    end
+end
+
+-- === TAB SETTINGS ===
+local settings = ui:MakeTab({"Settings"})
+settings:AddDropdown({
+    Name = "Chế độ TP",
+    Default = tpMode,
+    Options = {"Tween", "Instant", "Bypass + Reset"},
+    Callback = function(value)
+        tpMode = value
+    end
+})
+
+settings:AddParagraph({
+    Title = "Chọn Tween nếu sợ ban acc,còn bypass+ reset cũng an toàn mà thua tween",
+    Desc = "Tween: Bay mượt\nInstant: Nhảy liền\nBypass + Reset: Bay nhanh → 3x bypass → reset"
+})
