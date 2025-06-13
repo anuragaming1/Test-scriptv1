@@ -1,0 +1,194 @@
+local redzlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/daucobonhi/UiRedzV5/refs/heads/main/DemoUi.lua"))()
+
+local ui = redzlib:MakeWindow({
+    Title = "Anura Hub",
+    SubTitle = "เมนูบายพาสการเคลื่อนที่",
+    SaveFolder = "Blox Fruits"
+})
+
+ui:AddMinimizeButton({
+    Button = { Image = "rbxassetid://131151731604309", BackgroundTransparency = 0 },
+    Corner = { CornerRadius = UDim.new(0, 6) }
+})
+
+-- === แท็บ: สถานะซี ===
+local seatab = ui:MakeTab({"สถานะซี"})
+
+-- ตัวแปรกำหนดซีปัจจุบัน
+local Sea1, Sea2, Sea3 = false, false, false
+local CurrentSea = 0
+
+if game.PlaceId == 2753915549 then
+    Sea1 = true
+    CurrentSea = 1
+elseif game.PlaceId == 4442272183 then
+    Sea2 = true
+    CurrentSea = 2
+elseif game.PlaceId == 7449423635 then
+    Sea3 = true
+    CurrentSea = 3
+else
+    CurrentSea = 0
+end
+
+-- แสดงซีปัจจุบัน
+seatab:AddParagraph({
+    Title = "เลือกซีที่คุณต้องการเคลื่อนที่ไป",
+    Desc = CurrentSea == 1 and "🌴 ซี 1" or
+           CurrentSea == 2 and "🌊 ซี 2" or
+           CurrentSea == 3 and "🌌 ซี 3" or
+           "❓ ไม่ทราบ"
+})
+
+-- (ตัวเลือก) ปุ่มเปลี่ยนซีด่วนหากต้องการเพิ่ม
+seatab:AddSection("เปลี่ยนซี")
+
+seatab:AddButton({
+    Name = "🌀 ไปที่ ซี 1",
+    Callback = function()
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("TravelMain")
+    end
+})
+
+seatab:AddButton({
+    Name = "🌊 ไปที่ ซี 2",
+    Callback = function()
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("TravelDressrosa")
+    end
+})
+
+seatab:AddButton({
+    Name = "🌌 ไปที่ ซี 3",
+    Callback = function()
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("TravelZou")
+    end
+})
+
+-- === รายชื่อตำแหน่งตามซี (จาก MASTERY HUB V3) ===
+local IslandCFrame = {
+    ["ซี 1"] = {
+        ["กังหันลม"] = CFrame.new(889, 17, 1434),
+        ["ท่าเรือ"] = CFrame.new(-2728, 25, 2056),
+        ["กลางเมือง"] = CFrame.new(-688, 15, 1585),
+        ["ป่า"] = CFrame.new(-1614, 37, 146),
+        ["หมู่บ้านโจรสลัด"] = CFrame.new(-1173, 45, 3837),
+        ["ทะเลทราย"] = CFrame.new(945, 21, 4375),
+        ["เกาะหิมะ"] = CFrame.new(1298, 87, -1344),
+        ["อู่เรือ"] = CFrame.new(-4810, 21, 4359),
+        ["สนามโรมัน"] = CFrame.new(-1535, 7, -3014),
+        ["เกาะสวรรค์ 1"] = CFrame.new(-4814, 718, -2551),
+        ["เกาะสวรรค์ 2"] = CFrame.new(-4652, 873, -1754),
+        ["เกาะสวรรค์ 3"] = CFrame.new(-7895, 5547, -380),
+        ["คุก"] = CFrame.new(4870, 6, 736),
+        ["หมู่บ้านแมกม่า"] = CFrame.new(-5290, 9, 8349),
+        ["เกาะใต้น้ำ"] = CFrame.new(61164, 5, 1820),
+        ["เมืองน้ำพุ"] = CFrame.new(5128, 60, 4106),
+    },
+    ["ซี 2"] = {
+        ["ร้านกาแฟ"] = CFrame.new(-382, 73, 290),
+        ["จุดแรก"] = CFrame.new(-11, 29, 2771),
+        ["เกาะแบล็กบีร์ด"] = CFrame.new(3494, 13, -3259),
+        ["บ้านเฟลมิงโก"] = CFrame.new(-317, 331, 597),
+        ["ห้องเฟลมิงโก"] = CFrame.new(2285, 15, 905),
+        ["เขตสีเขียว"] = CFrame.new(-2258, 73, -2696),
+        ["เกาะซอมบี้"] = CFrame.new(-5552, 194, -776),
+        ["ภูเขาหิมะคู่"] = CFrame.new(752, 408, -5277),
+        ["พังก์อันตราย"] = CFrame.new(-5897, 18, -5096),
+        ["เรือสาป"] = CFrame.new(919, 125, 32869),
+        ["ปราสาทน้ำแข็ง"] = CFrame.new(5505, 40, -6178),
+        ["เกาะถูกลืม"] = CFrame.new(-3050, 240, -10178),
+        ["เกาะอูซป"] = CFrame.new(4816, 8, 2863),
+    },
+    ["ซี 3"] = {
+        ["คฤหาสน์"] = CFrame.new(-12471, 374, -7551),
+        ["ท่าเรือ"] = CFrame.new(-334, 7, 5300),
+        ["ป้อมบนทะเล"] = CFrame.new(-5073, 315, -3153),
+        ["เกาะไฮดร้า"] = CFrame.new(5756, 610, -282),
+        ["ต้นไม้ใหญ่"] = CFrame.new(2681, 1682, -7190),
+        ["เกาะเต่า"] = CFrame.new(-12528, 332, -8658),
+        ["เกาะกระดูก"] = CFrame.new(-9517, 142, 5528),
+        ["เกาะไอศกรีม"] = CFrame.new(-902, 79, -10988),
+        ["เกาะถั่ว"] = CFrame.new(-2062, 50, -10232),
+        ["เกาะเค้ก"] = CFrame.new(-1897, 14, -11576),
+        ["เกาะอ้อย"] = CFrame.new(-1038, 10, -14076),
+        ["ค่ายทีกี"] = CFrame.new(-16224, 9, 439),
+    }
+}
+
+local tpMode = "Tween" -- ค่าเริ่มต้น
+
+-- === ฟังก์ชันเคลื่อนที่ตามโหมด ===
+local function TweenTP(cf)
+    local hrp = game.Players.LocalPlayer.Character.HumanoidRootPart
+    local dist = (hrp.Position - cf.Position).Magnitude
+    game:GetService("TweenService"):Create(hrp, TweenInfo.new(dist / 300, Enum.EasingStyle.Linear), {CFrame = cf}):Play()
+end
+
+local function InstantTP(cf)
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = cf
+end
+
+local function BypassResetTP(cf)
+    local player = game.Players.LocalPlayer
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+
+    -- บินเร็วไปยังเกาะ
+    local speed = 3000
+    local dist = (hrp.Position - cf.Position).Magnitude
+    local duration = dist / speed
+
+    game:GetService("TweenService"):Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = cf + Vector3.new(0, 5, 0)}):Play()
+    wait(duration + 0.1)
+
+    -- บายพาส 3 ครั้ง
+    for i = 1, 3 do
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = cf + Vector3.new(0, 3, 0)
+            wait(0.15)
+        end
+    end
+
+    -- รีเซ็ต
+    wait(0.2)
+    player.Character:BreakJoints()
+end
+
+local function TPTo(cf)
+    if tpMode == "Tween" then
+        TweenTP(cf)
+    elseif tpMode == "Instant" then
+        InstantTP(cf)
+    elseif tpMode == "Bypass + Reset" then
+        BypassResetTP(cf)
+    end
+end
+
+-- === สร้างแท็บสำหรับซี 1 → ซี 2 → ซี 3 ===
+for _, sea in ipairs({"ซี 1", "ซี 2", "ซี 3"}) do
+    local tab = ui:MakeTab({sea})
+    for island, cf in pairs(IslandCFrame[sea]) do
+        tab:AddButton({
+            Name = island,
+            Callback = function()
+                TPTo(cf)
+            end
+        })
+    end
+end
+
+-- === แท็บการตั้งค่า ===
+local settings = ui:MakeTab({"การตั้งค่า"})
+settings:AddDropdown({
+    Name = "โหมดการเคลื่อนที่",
+    Default = tpMode,
+    Options = {"Tween", "Instant", "Bypass + Reset"},
+    Callback = function(value)
+        tpMode = value
+    end
+})
+
+settings:AddParagraph({
+    Title = "เลือก Tween หากกลัวถูกแบน, Bypass + Reset ก็ปลอดภัยแต่ช้ากว่า Tween",
+    Desc = "Tween: บินลื่นไหล\nInstant: กระโดดทันที\nBypass + Reset: บินเร็ว → บายพาส 3 ครั้ง → รีเซ็ต"
+})
