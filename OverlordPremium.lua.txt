@@ -2391,9 +2391,9 @@ ToggleUI.Parent = game.CoreGui
 ToggleUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ToggleButton.Name = "ToggleButton"
 ToggleButton.Parent = ToggleUI
-ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
-ToggleButton.BackgroundTransparency = 1
-ToggleButton.BorderSizePixel = 1
+ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 0, 255)
+ToggleButton.BackgroundTransparency = 2
+ToggleButton.BorderSizePixel = 5
 ToggleButton.Position = UDim2.new(0.120833337, 0, 0.0952890813, 0)
 ToggleButton.Size = UDim2.new(0, 50, 0, 50)
 ToggleButton.Image = "rbxassetid://13983616919"
@@ -7923,4 +7923,4 @@ spawn(function()
 			end
 		end
 	end
-end)
+end)nd)
