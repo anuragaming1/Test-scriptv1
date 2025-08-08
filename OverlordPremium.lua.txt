@@ -2405,7 +2405,7 @@ end)
       --------------------------------------------------------------------------------------------------------------------------------------------
 local Window = Fluent:CreateWindow({
 	Title = "Anura Hub",
-	SubTitle = "by Chat GPT",
+	SubTitle = "Script New",
 	TabWidth = 80,
 	Size = UDim2.fromOffset(500, 350),
 	Acrylic = true,
@@ -7923,4 +7923,4 @@ spawn(function()
 			end
 		end
 	end
-end)nd)
+end)nd))
