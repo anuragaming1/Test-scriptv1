@@ -1,0 +1,675 @@
+-- Switch Hub UI Library
+-- Designed similar to Rayfield Interface
+-- github.com/yourusername/switchhub
+
+local SwitchHub = {}
+
+-- Services
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Colors
+SwitchHub.Themes = {
+    Dark = {
+        Main = Color3.fromRGB(25, 25, 25),
+        Secondary = Color3.fromRGB(35, 35, 35),
+        Accent = Color3.fromRGB(255, 105, 180), -- Pink
+        Text = Color3.fromRGB(255, 255, 255),
+        SubText = Color3.fromRGB(200, 200, 200)
+    },
+    Light = {
+        Main = Color3.fromRGB(240, 240, 240),
+        Secondary = Color3.fromRGB(255, 255, 255),
+        Accent = Color3.fromRGB(255, 105, 180), -- Pink
+        Text = Color3.fromRGB(0, 0, 0),
+        SubText = Color3.fromRGB(100, 100, 100)
+    }
+}
+
+SwitchHub.CurrentTheme = SwitchHub.Themes.Dark
+
+-- Toggle Button (Movable) - FIXED: Will recreate if lost
+local function CreateToggleButton()
+    -- Remove existing toggle if any
+    if game.CoreGui:FindFirstChild("SwitchHubToggle") then
+        game.CoreGui:FindFirstChild("SwitchHubToggle"):Destroy()
+    end
+
+    local ToggleButton = Instance.new("ScreenGui")
+    local ImageButton = Instance.new("ImageButton")
+    local UICorner = Instance.new("UICorner")
+    local UIStroke = Instance.new("UIStroke")
+
+    ToggleButton.Name = "SwitchHubToggle"
+    ToggleButton.Parent = game.CoreGui
+    ToggleButton.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ToggleButton.ResetOnSpawn = false -- QUAN TRỌNG: Không reset khi respawn
+
+    ImageButton.Parent = ToggleButton
+    ImageButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    ImageButton.BorderSizePixel = 0
+    ImageButton.Position = UDim2.new(0, 10, 0, 10)
+    ImageButton.Size = UDim2.new(0, 40, 0, 40)
+    ImageButton.Image = "rbxassetid://100644623613900"
+    ImageButton.ZIndex = 1000
+
+    UICorner.CornerRadius = UDim.new(1, 0)
+    UICorner.Parent = ImageButton
+
+    UIStroke.Color = Color3.fromRGB(255, 105, 180) -- Pink
+    UIStroke.Thickness = 2
+    UIStroke.Parent = ImageButton
+
+    -- Draggable functionality for toggle button
+    local dragging = false
+    local dragInput, dragStart, startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        ImageButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    ImageButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = ImageButton.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    ImageButton.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+
+    return ToggleButton, ImageButton
+end
+
+-- Create toggle button immediately
+local ToggleButton, ToggleImageButton = CreateToggleButton()
+
+-- Core UI Functions
+function SwitchHub:CreateWindow(options)
+    options = options or {}
+    local window = {
+        Name = options.Name or "Switch Hub",
+        Icon = options.Icon or 0,
+        LoadingTitle = options.LoadingTitle or "Switch Hub",
+        LoadingSubtitle = options.LoadingSubtitle or "Powered by Switch Hub",
+        Theme = options.Theme or "Dark",
+        Keybind = options.Keybind or Enum.KeyCode.RightControl
+    }
+    
+    -- Set theme
+    if window.Theme == "Light" then
+        SwitchHub.CurrentTheme = SwitchHub.Themes.Light
+    else
+        SwitchHub.CurrentTheme = SwitchHub.Themes.Dark
+    end
+    
+    -- Main UI Container
+    local MainUI = Instance.new("ScreenGui")
+    local MainFrame = Instance.new("Frame")
+    local MainCorner = Instance.new("UICorner")
+    local TopBar = Instance.new("Frame")
+    local TopCorner = Instance.new("UICorner")
+    local Title = Instance.new("TextLabel")
+    local SubTitle = Instance.new("TextLabel")
+    local CloseButton = Instance.new("ImageButton")
+    local TabContainer = Instance.new("Frame")
+    local TabList = Instance.new("ScrollingFrame")
+    local ContentContainer = Instance.new("Frame")
+    
+    MainUI.Name = "SwitchHubUI"
+    MainUI.Parent = game.CoreGui
+    MainUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    MainUI.Enabled = false
+    MainUI.ResetOnSpawn = false -- QUAN TRỌNG: Không reset khi respawn
+    
+    MainFrame.Name = "MainFrame"
+    MainFrame.Parent = MainUI
+    MainFrame.BackgroundColor3 = SwitchHub.CurrentTheme.Main
+    MainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
+    MainFrame.Size = UDim2.new(0, 600, 0, 400)
+    MainFrame.ClipsDescendants = true
+    
+    MainCorner.CornerRadius = UDim.new(0, 8)
+    MainCorner.Parent = MainFrame
+    
+    -- Top Bar
+    TopBar.Name = "TopBar"
+    TopBar.Parent = MainFrame
+    TopBar.BackgroundColor3 = SwitchHub.CurrentTheme.Secondary
+    TopBar.Size = UDim2.new(1, 0, 0, 40)
+    
+    TopCorner.CornerRadius = UDim.new(0, 8)
+    TopCorner.Parent = TopBar
+    
+    Title.Name = "Title"
+    Title.Parent = TopBar
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.new(0, 15, 0, 0)
+    Title.Size = UDim2.new(0, 300, 1, 0)
+    Title.Font = Enum.Font.GothamSemibold
+    Title.Text = window.Name
+    Title.TextColor3 = SwitchHub.CurrentTheme.Text
+    Title.TextSize = 16
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    
+    SubTitle.Name = "SubTitle"
+    SubTitle.Parent = TopBar
+    SubTitle.BackgroundTransparency = 1
+    SubTitle.Position = UDim2.new(0, 15, 0, 20)
+    SubTitle.Size = UDim2.new(0, 300, 0, 20)
+    SubTitle.Font = Enum.Font.Gotham
+    SubTitle.Text = window.LoadingSubtitle
+    SubTitle.TextColor3 = SwitchHub.CurrentTheme.SubText
+    SubTitle.TextSize = 12
+    SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+    
+    CloseButton.Name = "CloseButton"
+    CloseButton.Parent = TopBar
+    CloseButton.BackgroundTransparency = 1
+    CloseButton.Position = UDim2.new(1, -35, 0, 10)
+    CloseButton.Size = UDim2.new(0, 20, 0, 20)
+    CloseButton.Image = "rbxassetid://3926305904"
+    CloseButton.ImageRectOffset = Vector2.new(924, 724)
+    CloseButton.ImageRectSize = Vector2.new(36, 36)
+    
+    -- Tab Container
+    TabContainer.Name = "TabContainer"
+    TabContainer.Parent = MainFrame
+    TabContainer.BackgroundColor3 = SwitchHub.CurrentTheme.Secondary
+    TabContainer.Position = UDim2.new(0, 0, 0, 40)
+    TabContainer.Size = UDim2.new(0, 150, 0, 360)
+    
+    TabList.Name = "TabList"
+    TabList.Parent = TabContainer
+    TabList.BackgroundTransparency = 1
+    TabList.Size = UDim2.new(1, 0, 1, 0)
+    TabList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    TabList.ScrollBarThickness = 0
+    
+    local TabLayout = Instance.new("UIListLayout")
+    TabLayout.Parent = TabList
+    TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    TabLayout.Padding = UDim.new(0, 5)
+    
+    local TabPadding = Instance.new("UIPadding")
+    TabPadding.Parent = TabList
+    TabPadding.PaddingLeft = UDim.new(0, 10)
+    TabPadding.PaddingTop = UDim.new(0, 10)
+    
+    -- Content Container
+    ContentContainer.Name = "ContentContainer"
+    ContentContainer.Parent = MainFrame
+    ContentContainer.BackgroundTransparency = 1
+    ContentContainer.Position = UDim2.new(0, 150, 0, 40)
+    ContentContainer.Size = UDim2.new(0, 450, 0, 360)
+    
+    -- Make window draggable
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
+    
+    local function update(input)
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+    
+    TopBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    TopBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+    
+    -- Close button functionality
+    CloseButton.MouseButton1Click:Connect(function()
+        MainUI.Enabled = false
+    end)
+    
+    -- FIXED: Recreate toggle button if it doesn't exist
+    local function EnsureToggleButton()
+        if not game.CoreGui:FindFirstChild("SwitchHubToggle") then
+            ToggleButton, ToggleImageButton = CreateToggleButton()
+            -- Reconnect the click event
+            ToggleImageButton.MouseButton1Click:Connect(function()
+                MainUI.Enabled = not MainUI.Enabled
+            end)
+        end
+    end
+    
+    -- Toggle button functionality
+    ToggleImageButton.MouseButton1Click:Connect(function()
+        MainUI.Enabled = not MainUI.Enabled
+    end)
+    
+    -- Keybind functionality
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == window.Keybind then
+            MainUI.Enabled = not MainUI.Enabled
+        end
+    end)
+    
+    -- FIXED: Auto-recreate toggle button on respawn
+    LocalPlayer.CharacterAdded:Connect(function()
+        wait(1) -- Wait a bit for everything to load
+        EnsureToggleButton()
+    end)
+    
+    -- Periodically check if toggle button exists (backup)
+    spawn(function()
+        while true do
+            wait(5)
+            EnsureToggleButton()
+        end
+    end)
+    
+    -- Window methods
+    function window:Destroy()
+        MainUI:Destroy()
+        if game.CoreGui:FindFirstChild("SwitchHubToggle") then
+            game.CoreGui:FindFirstChild("SwitchHubToggle"):Destroy()
+        end
+    end
+    
+    function window:Toggle()
+        MainUI.Enabled = not MainUI.Enabled
+    end
+    
+    -- Tab creation
+    function window:CreateTab(tabName, tabIcon)
+        local tab = {}
+        
+        -- Tab Button
+        local TabButton = Instance.new("TextButton")
+        local TabIcon = Instance.new("ImageLabel")
+        
+        TabButton.Name = tabName .. "Tab"
+        TabButton.Parent = TabList
+        TabButton.BackgroundColor3 = SwitchHub.CurrentTheme.Main
+        TabButton.BackgroundTransparency = 1
+        TabButton.Size = UDim2.new(1, -20, 0, 30)
+        TabButton.Font = Enum.Font.GothamSemibold
+        TabButton.Text = "  " .. tabName
+        TabButton.TextColor3 = SwitchHub.CurrentTheme.SubText
+        TabButton.TextSize = 14
+        TabButton.TextXAlignment = Enum.TextXAlignment.Left
+        
+        local TabCorner = Instance.new("UICorner")
+        TabCorner.CornerRadius = UDim.new(0, 6)
+        TabCorner.Parent = TabButton
+        
+        if tabIcon and tabIcon ~= 0 then
+            TabIcon.Name = "TabIcon"
+            TabIcon.Parent = TabButton
+            TabIcon.BackgroundTransparency = 1
+            TabIcon.Position = UDim2.new(0, 8, 0, 5)
+            TabIcon.Size = UDim2.new(0, 20, 0, 20)
+            if type(tabIcon) == "number" then
+                TabIcon.Image = "rbxassetid://" .. tabIcon
+            else
+                TabIcon.Image = tabIcon
+            end
+        end
+        
+        -- Tab Content
+        local TabContent = Instance.new("ScrollingFrame")
+        local ContentLayout = Instance.new("UIListLayout")
+        local ContentPadding = Instance.new("UIPadding")
+        
+        TabContent.Name = tabName .. "Content"
+        TabContent.Parent = ContentContainer
+        TabContent.BackgroundTransparency = 1
+        TabContent.Size = UDim2.new(1, 0, 1, 0)
+        TabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+        TabContent.ScrollBarThickness = 3
+        TabContent.ScrollBarImageColor3 = SwitchHub.CurrentTheme.Accent
+        TabContent.Visible = false
+        
+        ContentLayout.Parent = TabContent
+        ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        ContentLayout.Padding = UDim.new(0, 10)
+        
+        ContentPadding.Parent = TabContent
+        ContentPadding.PaddingLeft = UDim.new(0, 10)
+        ContentPadding.PaddingTop = UDim.new(0, 10)
+        ContentPadding.PaddingRight = UDim.new(0, 10)
+        
+        -- Auto-update canvas size
+        ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            TabContent.CanvasSize = UDim2.new(0, 0, 0, ContentLayout.AbsoluteContentSize.Y + 20)
+        end)
+        
+        -- Tab selection
+        TabButton.MouseButton1Click:Connect(function()
+            -- Hide all tab contents
+            for _, child in pairs(ContentContainer:GetChildren()) do
+                if child:IsA("ScrollingFrame") then
+                    child.Visible = false
+                end
+            end
+            
+            -- Reset all tab buttons
+            for _, child in pairs(TabList:GetChildren()) do
+                if child:IsA("TextButton") then
+                    child.BackgroundTransparency = 1
+                    child.TextColor3 = SwitchHub.CurrentTheme.SubText
+                end
+            end
+            
+            -- Show selected tab
+            TabContent.Visible = true
+            TabButton.BackgroundTransparency = 0
+            TabButton.TextColor3 = SwitchHub.CurrentTheme.Text
+        end)
+        
+        -- Select first tab by default
+        if #TabList:GetChildren() == 2 then -- Layout + First tab
+            TabButton.BackgroundTransparency = 0
+            TabButton.TextColor3 = SwitchHub.CurrentTheme.Text
+            TabContent.Visible = true
+        end
+        
+        -- Element creation functions
+        function tab:CreateSection(sectionName)
+            local section = {}
+            
+            local SectionFrame = Instance.new("Frame")
+            local SectionTitle = Instance.new("TextLabel")
+            local SectionLine = Instance.new("Frame")
+            
+            SectionFrame.Name = "Section"
+            SectionFrame.Parent = TabContent
+            SectionFrame.BackgroundTransparency = 1
+            SectionFrame.Size = UDim2.new(1, 0, 0, 40)
+            
+            SectionTitle.Name = "SectionTitle"
+            SectionTitle.Parent = SectionFrame
+            SectionTitle.BackgroundTransparency = 1
+            SectionTitle.Size = UDim2.new(1, 0, 0, 20)
+            SectionTitle.Font = Enum.Font.GothamSemibold
+            SectionTitle.Text = sectionName
+            SectionTitle.TextColor3 = SwitchHub.CurrentTheme.Text
+            SectionTitle.TextSize = 16
+            SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+            
+            SectionLine.Name = "SectionLine"
+            SectionLine.Parent = SectionFrame
+            SectionLine.BackgroundColor3 = SwitchHub.CurrentTheme.Accent
+            SectionLine.BorderSizePixel = 0
+            SectionLine.Position = UDim2.new(0, 0, 0, 25)
+            SectionLine.Size = UDim2.new(1, 0, 0, 1)
+            
+            function section:Destroy()
+                SectionFrame:Destroy()
+            end
+            
+            return section
+        end
+        
+        function tab:CreateButton(buttonConfig)
+            buttonConfig = buttonConfig or {}
+            
+            local button = {}
+            
+            local ButtonFrame = Instance.new("Frame")
+            local ButtonCorner = Instance.new("UICorner")
+            local Button = Instance.new("TextButton")
+            local ButtonTitle = Instance.new("TextLabel")
+            local ButtonIcon = Instance.new("ImageLabel")
+            
+            ButtonFrame.Name = "Button"
+            ButtonFrame.Parent = TabContent
+            ButtonFrame.BackgroundColor3 = SwitchHub.CurrentTheme.Accent
+            ButtonFrame.Size = UDim2.new(1, 0, 0, 40)
+            
+            ButtonCorner.CornerRadius = UDim.new(0, 6)
+            ButtonCorner.Parent = ButtonFrame
+            
+            Button.Name = "Button"
+            Button.Parent = ButtonFrame
+            Button.BackgroundColor3 = SwitchHub.CurrentTheme.Secondary
+            Button.BackgroundTransparency = 0
+            Button.Position = UDim2.new(0, 1, 0, 1)
+            Button.Size = UDim2.new(1, -2, 1, -2)
+            Button.AutoButtonColor = false
+            Button.Font = Enum.Font.SourceSans
+            Button.Text = ""
+            Button.TextColor3 = Color3.new(0, 0, 0)
+            Button.TextSize = 14
+            
+            local ButtonInnerCorner = Instance.new("UICorner")
+            ButtonInnerCorner.CornerRadius = UDim.new(0, 5)
+            ButtonInnerCorner.Parent = Button
+            
+            ButtonTitle.Name = "ButtonTitle"
+            ButtonTitle.Parent = Button
+            ButtonTitle.BackgroundTransparency = 1
+            ButtonTitle.Size = UDim2.new(1, -40, 1, 0)
+            ButtonTitle.Font = Enum.Font.GothamSemibold
+            ButtonTitle.Text = buttonConfig.Name or "Button"
+            ButtonTitle.TextColor3 = SwitchHub.CurrentTheme.Text
+            ButtonTitle.TextSize = 14
+            ButtonTitle.TextXAlignment = Enum.TextXAlignment.Left
+            ButtonTitle.Position = UDim2.new(0, 40, 0, 0)
+            
+            ButtonIcon.Name = "ButtonIcon"
+            ButtonIcon.Parent = Button
+            ButtonIcon.BackgroundTransparency = 1
+            ButtonIcon.Position = UDim2.new(0, 10, 0, 10)
+            ButtonIcon.Size = UDim2.new(0, 20, 0, 20)
+            ButtonIcon.Image = "rbxassetid://3926305904"
+            ButtonIcon.ImageRectOffset = Vector2.new(964, 324)
+            ButtonIcon.ImageRectSize = Vector2.new(36, 36)
+            
+            -- Hover effects
+            Button.MouseEnter:Connect(function()
+                TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundTransparency = 0.1}):Play()
+            end)
+            
+            Button.MouseLeave:Connect(function()
+                TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
+            end)
+            
+            Button.MouseButton1Click:Connect(function()
+                if buttonConfig.Callback then
+                    buttonConfig.Callback()
+                end
+            end)
+            
+            function button:Destroy()
+                ButtonFrame:Destroy()
+            end
+            
+            function button:SetButton(newConfig)
+                if newConfig.Name then
+                    ButtonTitle.Text = newConfig.Name
+                end
+                if newConfig.Callback then
+                    buttonConfig.Callback = newConfig.Callback
+                end
+            end
+            
+            return button
+        end
+        
+        function tab:CreateToggle(toggleConfig)
+            toggleConfig = toggleConfig or {}
+            
+            local toggle = {}
+            local isToggled = toggleConfig.Default or false
+            
+            local ToggleFrame = Instance.new("Frame")
+            local ToggleCorner = Instance.new("UICorner")
+            local ToggleButton = Instance.new("TextButton")
+            local ToggleTitle = Instance.new("TextLabel")
+            local ToggleSwitch = Instance.new("Frame")
+            local ToggleKnob = Instance.new("Frame")
+            local ToggleKnobCorner = Instance.new("UICorner")
+            
+            ToggleFrame.Name = "Toggle"
+            ToggleFrame.Parent = TabContent
+            ToggleFrame.BackgroundColor3 = SwitchHub.CurrentTheme.Secondary
+            ToggleFrame.Size = UDim2.new(1, 0, 0, 40)
+            
+            ToggleCorner.CornerRadius = UDim.new(0, 6)
+            ToggleCorner.Parent = ToggleFrame
+            
+            ToggleButton.Name = "ToggleButton"
+            ToggleButton.Parent = ToggleFrame
+            ToggleButton.BackgroundTransparency = 1
+            ToggleButton.Size = UDim2.new(1, 0, 1, 0)
+            ToggleButton.Font = Enum.Font.SourceSans
+            ToggleButton.Text = ""
+            ToggleButton.TextColor3 = Color3.new(0, 0, 0)
+            ToggleButton.TextSize = 14
+            
+            ToggleTitle.Name = "ToggleTitle"
+            ToggleTitle.Parent = ToggleFrame
+            ToggleTitle.BackgroundTransparency = 1
+            ToggleTitle.Size = UDim2.new(1, -60, 1, 0)
+            ToggleTitle.Font = Enum.Font.GothamSemibold
+            ToggleTitle.Text = toggleConfig.Name or "Toggle"
+            ToggleTitle.TextColor3 = SwitchHub.CurrentTheme.Text
+            ToggleTitle.TextSize = 14
+            ToggleTitle.TextXAlignment = Enum.TextXAlignment.Left
+            ToggleTitle.Position = UDim2.new(0, 15, 0, 0)
+            
+            ToggleSwitch.Name = "ToggleSwitch"
+            ToggleSwitch.Parent = ToggleFrame
+            ToggleSwitch.BackgroundColor3 = SwitchHub.CurrentTheme.Main
+            ToggleSwitch.Position = UDim2.new(1, -50, 0, 10)
+            ToggleSwitch.Size = UDim2.new(0, 40, 0, 20)
+            
+            local SwitchCorner = Instance.new("UICorner")
+            SwitchCorner.CornerRadius = UDim.new(1, 0)
+            SwitchCorner.Parent = ToggleSwitch
+            
+            ToggleKnob.Name = "ToggleKnob"
+            ToggleKnob.Parent = ToggleSwitch
+            ToggleKnob.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+            ToggleKnob.Size = UDim2.new(0, 16, 0, 16)
+            ToggleKnob.Position = UDim2.new(0, 2, 0, 2)
+            
+            ToggleKnobCorner.CornerRadius = UDim.new(1, 0)
+            ToggleKnobCorner.Parent = ToggleKnob
+            
+            local function updateToggle()
+                if isToggled then
+                    TweenService:Create(ToggleSwitch, TweenInfo.new(0.2), {BackgroundColor3 = SwitchHub.CurrentTheme.Accent}):Play()
+                    TweenService:Create(ToggleKnob, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+                    TweenService:Create(ToggleKnob, TweenInfo.new(0.2), {Position = UDim2.new(0, 22, 0, 2)}):Play()
+                else
+                    TweenService:Create(ToggleSwitch, TweenInfo.new(0.2), {BackgroundColor3 = SwitchHub.CurrentTheme.Main}):Play()
+                    TweenService:Create(ToggleKnob, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(200, 200, 200)}):Play()
+                    TweenService:Create(ToggleKnob, TweenInfo.new(0.2), {Position = UDim2.new(0, 2, 0, 2)}):Play()
+                end
+            end
+            
+            ToggleButton.MouseButton1Click:Connect(function()
+                isToggled = not isToggled
+                updateToggle()
+                if toggleConfig.Callback then
+                    toggleConfig.Callback(isToggled)
+                end
+            end)
+            
+            -- Set initial state
+            updateToggle()
+            
+            function toggle:Destroy()
+                ToggleFrame:Destroy()
+            end
+            
+            function toggle:SetValue(value)
+                isToggled = value
+                updateToggle()
+                if toggleConfig.Callback then
+                    toggleConfig.Callback(isToggled)
+                end
+            end
+            
+            return toggle
+        end
+        
+        function tab:CreateLabel(labelConfig)
+            labelConfig = labelConfig or {}
+            
+            local label = {}
+            
+            local LabelFrame = Instance.new("Frame")
+            local LabelText = Instance.new("TextLabel")
+            
+            LabelFrame.Name = "Label"
+            LabelFrame.Parent = TabContent
+            LabelFrame.BackgroundTransparency = 1
+            LabelFrame.Size = UDim2.new(1, 0, 0, 30)
+            
+            LabelText.Name = "LabelText"
+            LabelText.Parent = LabelFrame
+            LabelText.BackgroundTransparency = 1
+            LabelText.Size = UDim2.new(1, 0, 1, 0)
+            LabelText.Font = Enum.Font.Gotham
+            LabelText.Text = labelConfig.Text or "Label"
+            LabelText.TextColor3 = SwitchHub.CurrentTheme.SubText
+            LabelText.TextSize = 14
+            LabelText.TextXAlignment = Enum.TextXAlignment.Left
+            
+            function label:Destroy()
+                LabelFrame:Destroy()
+            end
+            
+            function label:SetText(newText)
+                LabelText.Text = newText
+            end
+            
+            return label
+        end
+        
+        return tab
+    end
+    
+    return window
+end
+
+-- Export the library
+return SwitchHub
